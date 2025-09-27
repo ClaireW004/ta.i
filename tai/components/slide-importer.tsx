@@ -18,7 +18,11 @@ interface SlideImportResult {
   source: "google-slides" | "pptx"
 }
 
-export function SlideImporter() {
+interface SlideImporterProps {
+  onImportSuccess?: () => void | Promise<void>
+}
+
+export function SlideImporter({ onImportSuccess }: SlideImporterProps = {}) {
   const [isLoading, setIsLoading] = useState(false)
   const [importResult, setImportResult] = useState<SlideImportResult | null>(null)
   const [googleSlidesUrl, setGoogleSlidesUrl] = useState("")
@@ -81,6 +85,11 @@ export function SlideImporter() {
         title: "Import Successful",
         description: `Imported "${result.title}" with ${result.slideCount} slides`,
       })
+
+      // Call the success callback if provided
+      if (onImportSuccess) {
+        await onImportSuccess()
+      }
 
       setGoogleSlidesUrl("")
     } catch (error) {
@@ -162,6 +171,11 @@ export function SlideImporter() {
         title: "Import Successful",
         description: `Imported "${result.title}" with ${result.slideCount} slides`,
       })
+
+      // Call the success callback if provided
+      if (onImportSuccess) {
+        await onImportSuccess()
+      }
 
       setSelectedFile(null)
       // Reset file input

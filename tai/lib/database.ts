@@ -104,6 +104,16 @@ export class DatabaseService {
     return result.rows[0] || null
   }
 
+  async getUserPresentations(userEmail: string): Promise<PresentationRecord[]> {
+    const query = `
+      SELECT * FROM presentations 
+      WHERE created_by = $1 
+      ORDER BY updated_at DESC
+    `
+    const result = await pool.query(query, [userEmail])
+    return result.rows
+  }
+
   async createSlide(data: Omit<SlideRecord, 'id' | 'created_at' | 'updated_at'>): Promise<SlideRecord> {
     const query = `
       INSERT INTO slides (

@@ -1,12 +1,78 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import { useSession, signIn, signOut } from "next-auth/react"
 import { SlideImporter } from "@/components/slide-importer"
+import { PresentationViewer } from "@/components/presentation-viewer"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { PlayCircle, FileText, Calendar, ChevronRight, LogIn } from "lucide-react"
+
+interface Presentation {
+  id: number
+  presentation_id: string
+  title: string
+  slide_count: number
+  created_at: string
+  updated_at: string
+}
 
 export default function Home() {
   const { data: session, status } = useSession()
+  const [presentations, setPresentations] = useState<Presentation[]>([])
+  const [loading, setLoading] = useState(true)
+  const [selectedPresentationId, setSelectedPresentationId] = useState<string | null>(null)
+
+  // Automatically sign out if there's an auth error to clear corrupted session
+  useEffect(() => {
+    if (session?.error === "RefreshTokenExpired" || session?.error === "NoRefreshToken") {
+      console.log('🔄 Authentication error detected, signing out automatically')
+      signOut({ redirect: false })
+    }
+  }, [session?.error])
+
+  useEffect(() => {
+    if (session) {
+      loadPresentations()
+    }
+  }, [session])
+
+  const loadPresentations = async () => {
+    try {
+      const response = await fetch("/api/presentations")
+      if (response.ok) {
+        const data = await response.json()
+        setPresentations(data.presentations || [])
+      } else if (response.status === 401) {
+        // Authentication issue - force session refresh
+        console.log("🔄 Authentication error, refreshing session...")
+        window.location.reload()
+      }
+    } catch (error) {
+      console.error("Error loading presentations:", error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handlePresentationSelect = (presentationId: string) => {
+    setSelectedPresentationId(presentationId)
+  }
+
+  const handleBackToList = () => {
+    setSelectedPresentationId(null)
+    // Reload presentations to get any updates
+    loadPresentations()
+  }
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    })
+  }
 
   if (status === "loading") {
     return (
@@ -14,6 +80,43 @@ export default function Home() {
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
           <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </main>
+    )
+  }
+
+  // Handle authentication errors (like expired refresh token)
+  if (session?.error === "RefreshTokenExpired" || session?.error === "NoRefreshToken") {
+    return (
+      <main className="min-h-screen bg-background">
+        <div className="container mx-auto px-4 py-16 max-w-md">
+          <Card className="border-yellow-200 bg-yellow-50 dark:bg-yellow-950/30">
+            <CardHeader className="text-center">
+              <CardTitle className="text-yellow-800 dark:text-yellow-200">Authentication Required</CardTitle>
+              <CardDescription className="text-yellow-700 dark:text-yellow-300">
+                Your Google authentication session needs to be refreshed. Please sign in again to continue.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+                          <CardFooter className="flex justify-center">
+              <Button 
+                onClick={async () => {
+                  // Clear the corrupted session first
+                  await signOut({ redirect: false })
+                  // Then sign in fresh
+                  signIn('google')
+                }} 
+                className="bg-yellow-600 hover:bg-yellow-700 text-white"
+              >
+                <LogIn className="mr-2 h-4 w-4" />
+                Sign In Again
+              </Button>
+            </CardFooter>
+              <p className="text-xs text-yellow-600 dark:text-yellow-400 text-center">
+                This happens periodically for security. Your presentations are safe.
+              </p>
+            </CardContent>
+          </Card>
         </div>
       </main>
     )
@@ -74,6 +177,29 @@ export default function Home() {
     )
   }
 
+  // Show presentation viewer if a presentation is selected
+  if (selectedPresentationId) {
+    return (
+      <div className="min-h-screen">
+        <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+          <div className="container mx-auto px-4 py-3">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleBackToList}
+              className="mb-2"
+            >
+              ← Back to Presentations
+            </Button>
+          </div>
+        </div>
+        <div className="container mx-auto px-4 py-6">
+          <PresentationViewer presentationId={selectedPresentationId} />
+        </div>
+      </div>
+    )
+  }
+
   return (
     <main className="min-h-screen bg-background">
       {/* Header with user info */}
@@ -104,7 +230,73 @@ export default function Home() {
       {/* Main content */}
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-4xl mx-auto">
-          <SlideImporter />
+          {/* Import Section */}
+          <div className="mb-12">
+            <SlideImporter onImportSuccess={loadPresentations} />
+          </div>
+
+          {/* Presentations Section */}
+          <div>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-semibold">Your Presentations</h2>
+              {presentations.length > 0 && (
+                <Badge variant="secondary">{presentations.length} presentation(s)</Badge>
+              )}
+            </div>
+
+            {loading ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+              </div>
+            ) : presentations.length === 0 ? (
+              <Card>
+                <CardContent className="py-12 text-center">
+                  <FileText className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+                  <h3 className="text-lg font-medium mb-2">No presentations yet</h3>
+                  <p className="text-muted-foreground mb-4">
+                    Import your first presentation from Google Slides to get started
+                  </p>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {presentations.map((presentation) => (
+                  <Card key={presentation.id} className="hover:shadow-md transition-shadow cursor-pointer">
+                    <CardHeader>
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <CardTitle className="text-lg mb-2 line-clamp-2">
+                            {presentation.title}
+                          </CardTitle>
+                          <CardDescription className="flex items-center space-x-4 text-sm">
+                            <span className="flex items-center space-x-1">
+                              <FileText className="w-4 h-4" />
+                              <span>{presentation.slide_count} slides</span>
+                            </span>
+                            <span className="flex items-center space-x-1">
+                              <Calendar className="w-4 h-4" />
+                              <span>{formatDate(presentation.updated_at)}</span>
+                            </span>
+                          </CardDescription>
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <Button
+                        onClick={() => handlePresentationSelect(presentation.presentation_id)}
+                        className="w-full"
+                        size="sm"
+                      >
+                        <PlayCircle className="w-4 h-4 mr-2" />
+                        Start Presenting
+                        <ChevronRight className="w-4 h-4 ml-2" />
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </main>
