@@ -223,6 +223,7 @@ export function PresentationViewer({ presentationId }: PresentationViewerProps) 
       
       // Reset loading state after a brief moment
       setTimeout(() => setSlideLoading(false), 1000)
+      // Fetch agent suggestions for the newly selected slide
       sendQuery();
     }
   }
@@ -247,19 +248,27 @@ export function PresentationViewer({ presentationId }: PresentationViewerProps) 
   const prevSlide = () => goToSlide(currentSlideIndex - 1)
 
   async function sendQuery() {
-    setResponse("");
+    // Safely read the current slide content at call time
+    const slide = slides[currentSlideIndex]
+    const queryText = slide?.content || slide?.title || ""
+    if (!queryText) {
+      setResponse("")
+      return
+    }
+
+    setResponse("")
     try {
       const res = await fetch("http://localhost:5000/query", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ query: currentSlide.content }),
-      });
-      const data = await res.json();
-      setResponse(data.response);
+        body: JSON.stringify({ query: queryText }),
+      })
+      const data = await res.json()
+      setResponse(data.response)
     } catch (error) {
-      setResponse("Error communicating with AI backend.");
+      setResponse("Error communicating with AI backend.")
     }
   }
 
@@ -564,7 +573,7 @@ Tip: Keep this browser tab active to use keyboard shortcuts!
                       <div className="bg-muted/30 p-4 rounded-lg">
                         <h3 className="text-sm font-medium mb-2 text-muted-foreground">Slide Content</h3>
                         <div className="whitespace-pre-wrap text-sm leading-relaxed">
-                          {response}
+                          {currentSlide.content}
                         </div>
                       </div>
                     </div>
@@ -615,6 +624,23 @@ Tip: Keep this browser tab active to use keyboard shortcuts!
             ) : suggestions.length > 0 ? (
               <ScrollArea className="h-full pr-4">
                 <div className="space-y-3">
+                  {/* Agent response (from Flask) shown at the top if available */}
+                  {response && (
+                    <Card className="p-3 border-primary/30">
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex items-center space-x-2 flex-1 min-w-0">
+                          <Lightbulb className="w-4 h-4" />
+                          <span className="font-medium text-sm truncate">Agent Suggestion</span>
+                        </div>
+                        <Badge variant="default" className="text-xs flex-shrink-0 ml-2">
+                          live
+                        </Badge>
+                      </div>
+                      <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
+                        {response}
+                      </p>
+                    </Card>
+                  )}
                   {suggestions.map((suggestion, index) => (
                     <Card key={index} className="p-3 hover:bg-muted/30 transition-colors border border-muted">
                       <div className="flex items-start justify-between mb-2">
