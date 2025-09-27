@@ -8,6 +8,7 @@ import { Separator } from "@/components/ui/separator"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Input } from "@/components/ui/input"
 import { ChevronLeft, ChevronRight, Lightbulb, Clock, MessageCircle, TrendingUp, FileText, AlertCircle } from "lucide-react"
+import { send } from "process"
 
 interface Slide {
   id: number
@@ -131,6 +132,7 @@ export function PresentationViewer({ presentationId }: PresentationViewerProps) 
   const [presenterMode, setPresenterMode] = useState(false)
   const [presenterWindow, setPresenterWindow] = useState<Window | null>(null)
   const [slideLoading, setSlideLoading] = useState(false)
+  const [response, setResponse] = useState("");
 
   // Load presentation data
   useEffect(() => {
@@ -221,6 +223,7 @@ export function PresentationViewer({ presentationId }: PresentationViewerProps) 
       
       // Reset loading state after a brief moment
       setTimeout(() => setSlideLoading(false), 1000)
+      sendQuery();
     }
   }
 
@@ -242,6 +245,23 @@ export function PresentationViewer({ presentationId }: PresentationViewerProps) 
 
   const nextSlide = () => goToSlide(currentSlideIndex + 1)
   const prevSlide = () => goToSlide(currentSlideIndex - 1)
+
+  async function sendQuery() {
+    setResponse("");
+    try {
+      const res = await fetch("http://localhost:5000/query", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ query: currentSlide.content }),
+      });
+      const data = await res.json();
+      setResponse(data.response);
+    } catch (error) {
+      setResponse("Error communicating with AI backend.");
+    }
+  }
 
   // Keyboard shortcuts for presentation control
   useEffect(() => {
@@ -544,7 +564,7 @@ Tip: Keep this browser tab active to use keyboard shortcuts!
                       <div className="bg-muted/30 p-4 rounded-lg">
                         <h3 className="text-sm font-medium mb-2 text-muted-foreground">Slide Content</h3>
                         <div className="whitespace-pre-wrap text-sm leading-relaxed">
-                          {currentSlide.content}
+                          {response}
                         </div>
                       </div>
                     </div>
