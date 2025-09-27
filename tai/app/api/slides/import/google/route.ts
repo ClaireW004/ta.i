@@ -91,15 +91,18 @@ export async function POST(request: NextRequest) {
 
           // Get and store thumbnail if available
           let thumbnailPath
-          const thumbnailUrl = await slidesService.getThumbnail(presentationId, slide.slideId)
+          let thumbnailUrl
           
-          if (thumbnailUrl) {
-            try {
+          try {
+            thumbnailUrl = await slidesService.getThumbnail(presentationId, slide.slideId)
+            
+            if (thumbnailUrl) {
               const thumbnailBuffer = await gcs.downloadThumbnailFromUrl(thumbnailUrl)
               thumbnailPath = await gcs.uploadThumbnail(presentationId, slide.slideId, thumbnailBuffer)
-            } catch (thumbnailError) {
-              console.warn(`Failed to process thumbnail for slide ${slide.slideId}:`, thumbnailError)
             }
+          } catch (thumbnailError) {
+            console.warn(`Failed to process thumbnail for slide ${slide.slideId}:`, thumbnailError instanceof Error ? thumbnailError.message : thumbnailError)
+            // Continue without thumbnail
           }
 
           // Store slide record in database
