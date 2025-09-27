@@ -1,4 +1,3 @@
-# @title Import necessary libraries
 import os
 import asyncio
 from google.adk.agents import Agent
@@ -6,6 +5,10 @@ from google.adk.models.lite_llm import LiteLlm # For multi-model support
 from google.adk.sessions import InMemorySessionService
 from google.adk.runners import Runner
 from google.genai import types # For creating message Content/Parts
+
+# IMPORTING TOOLS FOR AGENTS
+from google.adk.tools import google_search
+
 
 import warnings
 # Ignore all warnings
@@ -16,51 +19,24 @@ logging.basicConfig(level=logging.ERROR)
 
 print("Libraries imported.")
 
-
-# @title Configure API Keys (Replace with your actual keys!)
-
-# --- IMPORTANT: Replace placeholders with your real API keys ---
-
 from dotenv import load_dotenv
-
 load_dotenv()
-
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 
 # Gemini API Key (Get from Google AI Studio: https://aistudio.google.com/app/apikey)
-os.environ["GOOGLE_API_KEY"] = GOOGLE_API_KEY # <--- REPLACE
-
-# [Optional]
-# OpenAI API Key (Get from OpenAI Platform: https://platform.openai.com/api-keys)
-#os.environ['OPENAI_API_KEY'] = 'YOUR_OPENAI_API_KEY' # <--- REPLACE
-
-# [Optional]
-# Anthropic API Key (Get from Anthropic Console: https://console.anthropic.com/settings/keys)
-#os.environ['ANTHROPIC_API_KEY'] = 'YOUR_ANTHROPIC_API_KEY' # <--- REPLACE
+os.environ["GOOGLE_API_KEY"] = GOOGLE_API_KEY
 
 # --- Verify Keys (Optional Check) ---
 print("API Keys Set:")
 print(f"Google API Key set: {'Yes' if os.environ.get('GOOGLE_API_KEY') and os.environ['GOOGLE_API_KEY'] != 'YOUR_GOOGLE_API_KEY' else 'No (REPLACE PLACEHOLDER!)'}")
-print(f"OpenAI API Key set: {'Yes' if os.environ.get('OPENAI_API_KEY') and os.environ['OPENAI_API_KEY'] != 'YOUR_OPENAI_API_KEY' else 'No (REPLACE PLACEHOLDER!)'}")
-print(f"Anthropic API Key set: {'Yes' if os.environ.get('ANTHROPIC_API_KEY') and os.environ['ANTHROPIC_API_KEY'] != 'YOUR_ANTHROPIC_API_KEY' else 'No (REPLACE PLACEHOLDER!)'}")
 
 # Configure ADK to use API keys directly (not Vertex AI for this multi-model setup)
 os.environ["GOOGLE_GENAI_USE_VERTEXAI"] = "False"
-
-
-# @markdown **Security Note:** It's best practice to manage API keys securely (e.g., using Colab Secrets or environment variables) rather than hardcoding them directly in the notebook. Replace the placeholder strings above.
-
 
 # --- Define Model Constants for easier use ---
 
 # More supported models can be referenced here: https://ai.google.dev/gemini-api/docs/models#model-variations
 MODEL_GEMINI_2_0_FLASH = "gemini-2.0-flash"
-
-# More supported models can be referenced here: https://docs.litellm.ai/docs/providers/openai#openai-chat-completion-models
-MODEL_GPT_4O = "openai/gpt-4.1" # You can also try: gpt-4.1-mini, gpt-4o etc.
-
-# More supported models can be referenced here: https://docs.litellm.ai/docs/providers/anthropic
-MODEL_CLAUDE_SONNET = "anthropic/claude-sonnet-4-20250514" # You can also try: claude-opus-4-20250514 , claude-3-7-sonnet-20250219 etc
 
 print("\nEnvironment configured.")
 
@@ -94,26 +70,23 @@ def get_weather(city: str) -> dict:
         return {"status": "error", "error_message": f"Sorry, I don't have weather information for '{city}'."}
 
 # Example tool usage (optional test)
-print(get_weather("New York"))
-print(get_weather("Paris"))
+# print(get_weather("New York"))
+# print(get_weather("Paris"))
 
 
 # @title Define the Weather Agent
 # Use one of the model constants defined earlier
 AGENT_MODEL = MODEL_GEMINI_2_0_FLASH # Starting with Gemini
 
-from google.adk.tools import google_search
-
-
-weather_agent = Agent(
-    name="weather_agent_v1",
+time_date_agent = Agent(
+    name="time_date_agent_v1",
     model=AGENT_MODEL, # Can be a string for Gemini or a LiteLlm object
-    description="Provides time information for specific cities.",
-    instruction="You are a helpful assistant that provides the time and date in some countries/cities at the current time based on a google search.",
+    description="Provides current time and date for cities or countries in the world.",
+    instruction="You are a helpful assistant that provides the current time and date in some countries/cities based on a google search.",
     tools=[google_search], # Pass the function directly
 )
 
-print(f"Agent '{weather_agent.name}' created using model '{AGENT_MODEL}'.")
+print(f"Agent '{time_date_agent.name}' created using model '{AGENT_MODEL}'.")
 
 
 # @title Setup Session Service and Runner
@@ -142,7 +115,7 @@ async def main():
     # --- Runner ---
     global runner  # Let us use the global runner variable defined earlier
     runner = Runner(
-        agent=weather_agent,       # The agent we want to run
+        agent=time_date_agent,       # The agent we want to run
         app_name=APP_NAME,         # Associates runs with our app
         session_service=session_service  # Uses our session manager
     )
@@ -193,23 +166,19 @@ async def run_conversation():
                                        user_id=USER_ID,
                                        session_id=SESSION_ID)
 
-    # await call_agent_async("How about Paris?",
-    #                                    runner=runner,
-    #                                    user_id=USER_ID,
-    #                                    session_id=SESSION_ID) # Expecting the tool's error message
+    await call_agent_async("How about Paris?",
+                                       runner=runner,
+                                       user_id=USER_ID,
+                                       session_id=SESSION_ID)
 
-    # await call_agent_async("Tell me the weather in New York",
-    #                                    runner=runner,
-    #                                    user_id=USER_ID,
-    #                                    session_id=SESSION_ID)
+    await call_agent_async("Tell me for New York",
+                                       runner=runner,
+                                       user_id=USER_ID,
+                                       session_id=SESSION_ID)
+    
 
-# Execute the conversation using await in an async context (like Colab/Jupyter)
-# await run_conversation()
 
-# --- OR ---
 
-# Uncomment the following lines if running as a standard Python script (.py file):
-import asyncio
 if __name__ == "__main__":
     try:
         asyncio.run(main())

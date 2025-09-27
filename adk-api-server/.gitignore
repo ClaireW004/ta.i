@@ -1,1 +1,5 @@
 .env
+
+# env format:
+# GOOGLE_GENAI_USE_VERTEXAI=FALSE
+# GOOGLE_API_KEY=api-key
