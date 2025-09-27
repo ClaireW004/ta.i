@@ -122,7 +122,12 @@ async def main():
     print(f"Runner created for agent '{runner.agent.name}'.")
 
     # Run the conversation
-    await run_conversation()
+    inputs = ["What is the time and date in Singapore?", "How about Paris?", "Tell me for New York"]
+
+    await run_conversation(inputs[0])
+    await run_conversation(inputs[1])
+    await run_conversation(inputs[2])
+
 
 
 # @title Define Agent Interaction Function
@@ -160,21 +165,11 @@ async def call_agent_async(query: str, runner, user_id, session_id):
   # @title Run the Initial Conversation
 
 # We need an async function to await our interaction helper
-async def run_conversation():
-    await call_agent_async("What is the time and date in Singapore?",
-                                       runner=runner,
-                                       user_id=USER_ID,
-                                       session_id=SESSION_ID)
-
-    await call_agent_async("How about Paris?",
-                                       runner=runner,
-                                       user_id=USER_ID,
-                                       session_id=SESSION_ID)
-
-    await call_agent_async("Tell me for New York",
-                                       runner=runner,
-                                       user_id=USER_ID,
-                                       session_id=SESSION_ID)
+async def run_conversation(input):
+    await call_agent_async(input,
+                            runner=runner,
+                            user_id=USER_ID,
+                            session_id=SESSION_ID)
     
 
 
