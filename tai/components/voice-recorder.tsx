@@ -91,22 +91,12 @@ export function VoiceRecorder({ onTranscript }: VoiceRecorderProps) {
     <div className="space-y-2">
       <div className="flex items-center gap-2">
         {!recording ? (
-          <Button size="sm" onClick={startRecording}>🎙️ Record</Button>
+          <Button size="sm" onClick={startRecording}>Record</Button>
         ) : (
-          <Button size="sm" variant="destructive" onClick={stopRecording}>■ Stop</Button>
+          <Button size="sm" variant="destructive" onClick={stopRecording}>Stop</Button>
         )}
         {status && <Badge variant="outline" className="text-xs">{status}</Badge>}
       </div>
-      {transcript && (
-        <Card className="p-3 text-sm whitespace-pre-wrap">
-          {transcript}
-          {fileUrl && (
-            <div className="mt-2 text-xs text-muted-foreground">
-              Saved: <a className="underline" href={fileUrl} target="_blank" rel="noreferrer">{fileUrl}</a>
-            </div>
-          )}
-        </Card>
-      )}
     </div>
   )
 }
