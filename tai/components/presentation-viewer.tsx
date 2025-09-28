@@ -251,7 +251,6 @@ export function PresentationViewer({ presentationId }: PresentationViewerProps) 
         }
       }
       
-      sendQuery();
     }
   }
 
@@ -277,7 +276,14 @@ export function PresentationViewer({ presentationId }: PresentationViewerProps) 
   async function sendQuery() {
     // Safely read the current slide content at call time
     const slide = slides[currentSlideIndex]
-    const queryText = slide?.content || slide?.title || ""
+    const parts = []
+    if (slide?.title) {
+      parts.push(slide.title)
+    }
+    if (slide?.content) {
+      parts.push(slide.content)
+    }
+    const queryText = parts.join(" ")
     if (!queryText) {
       setResponse("")
       return
