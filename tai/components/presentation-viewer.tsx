@@ -164,12 +164,14 @@ export function PresentationViewer({ presentationId }: PresentationViewerProps) 
   const [suggestions, setSuggestions] = useState<Suggestion[]>([])
   const [loading, setLoading] = useState(true)
   const [suggestionsLoading, setSuggestionsLoading] = useState(false)
+  const [summaryLoading, setSummaryLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<'embed' | 'content'>('embed')
   const [presenterMode, setPresenterMode] = useState(false)
   const [presenterWindow, setPresenterWindow] = useState<Window | null>(null)
   const [slideLoading, setSlideLoading] = useState(false)
-  const [response, setResponse] = useState("");
+  const [response, setResponse] = useState("")
+  const [transcript, setTranscript] = useState<string | null>(null)
   // Show a UI pacing reminder when per-slide duration has elapsed
   const [pacingReminderActive, setPacingReminderActive] = useState(false)
   // Auto-advance timer ref (holds the timeout id)
@@ -298,8 +300,6 @@ export function PresentationViewer({ presentationId }: PresentationViewerProps) 
 
       // Reset loading state after a brief moment
       setTimeout(() => setSlideLoading(false), 1000)
-      // Fetch agent suggestions for the newly selected slide
-      sendQuery();
     }
   }
 
@@ -346,7 +346,14 @@ export function PresentationViewer({ presentationId }: PresentationViewerProps) 
   async function sendQuery() {
     // Safely read the current slide content at call time
     const slide = slides[currentSlideIndex]
-    const queryText = slide?.content || slide?.title || ""
+    const parts = []
+    if (slide?.title) {
+      parts.push(slide.title)
+    }
+    if (slide?.content) {
+      parts.push(slide.content)
+    }
+    const queryText = parts.join(" ")
     if (!queryText) {
       setResponse("")
       return
@@ -365,6 +372,69 @@ export function PresentationViewer({ presentationId }: PresentationViewerProps) 
       setResponse(data.response)
     } catch (error) {
       setResponse("Error communicating with AI backend.")
+    }
+  }
+
+  async function sendSummaryQuery() {
+    setSummaryLoading(true)
+
+    try {
+      // Concatenate content from all slides
+      const slideContent = slides
+        .map(slide => {
+          const title = slide.title ? `\n\n# ${slide.title}\n` : ""
+          const content = slide.content || ""
+          const notes = slide.speaker_notes ? `\n**Speaker Notes:**\n${slide.speaker_notes}` : ""
+          return `${title}${content}${notes}`
+        })
+        .join("\n\n---\n\n")
+
+      // Combine slide content and transcript
+      let fullText = slideContent;
+      if (transcript) {
+        fullText += `\n\n### Presentation Transcript\n\n${transcript}`;
+      }
+
+      if (!fullText.trim()) {
+        alert("No content to summarize.")
+        setSummaryLoading(false)
+        return
+      }
+
+      const res = await fetch("http://localhost:5000/summarize", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ text: fullText }),
+      })
+
+      if (!res.ok) {
+        throw new Error(`Server responded with ${res.status}`)
+      }
+
+      const data = await res.json()
+      
+      const summaryContent = data.summary;
+      if (summaryContent) {
+        const blob = new Blob([summaryContent], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${presentation?.title || 'presentation'}_summary.txt`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      } else {
+        alert("Summary could not be generated.");
+      }
+
+    } catch (error) {
+      console.error("Error fetching summary:", error)
+      alert("Error communicating with summary AI backend.")
+    } finally {
+      setSummaryLoading(false)
     }
   }
 
@@ -420,7 +490,7 @@ export function PresentationViewer({ presentationId }: PresentationViewerProps) 
   useEffect(() => {
     if (presenterMode) {
       console.log(`
-🎭 PRESENTER MODE ACTIVE 
+PRESENTER MODE ACTIVE 
 ------------------------
 Current slide: ${currentSlideIndex + 1} of ${slides.length}
 
@@ -503,14 +573,14 @@ Tip: Keep this browser tab active to use keyboard shortcuts!
               >
                 Live Slide
               </Button>
-              <Button
+              {/* <Button
                 variant={viewMode === 'content' ? 'default' : 'outline'}
                 size="sm"
                 onClick={() => setViewMode('content')}
                 className="text-xs"
               >
                 Content
-              </Button>
+              </Button> */}
               <Button
                 variant={presenterMode ? 'default' : 'outline'}
                 size="sm"
@@ -586,8 +656,8 @@ Tip: Keep this browser tab active to use keyboard shortcuts!
                       {/* Sync Information */}
                       <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-3 mb-4">
                         <div className="flex items-center space-x-2 text-sm text-blue-700 dark:text-blue-300">
-                          <span className="font-medium">🔄 Synchronization:</span>
-                          <span>Use the navigation buttons or keyboard arrows (← →) to control both the slide display and content below. Click the slide to advance.</span>
+                          <span className="font-medium">Synchronized Navigation:</span>
+                          <span>Use the navigation buttons or keyboard arrows (← →) to control both the slide display and content below. The iframe will automatically load the correct slide.</span>
                         </div>
                       </div>
 
@@ -645,7 +715,7 @@ Tip: Keep this browser tab active to use keyboard shortcuts!
 
 
                   {/* Content-only View */}
-                  {viewMode === 'content' && (
+                  {/*viewMode === 'content' && (
                     <div className="max-w-4xl mx-auto">
                       <ScrollArea className="max-h-[65vh] p-8">
                         {currentSlide.title && (
@@ -666,8 +736,8 @@ Tip: Keep this browser tab active to use keyboard shortcuts!
                         )}
                       </ScrollArea>
                     </div>
-                  )}
-
+                  )*/}
+                  
                   {/* Fallback when embed is not available */}
                   {viewMode === 'embed' && (!presentation.source_url || !presentation.source_url.includes('docs.google.com')) && (
                     <div className="text-center py-12">
@@ -741,8 +811,16 @@ Tip: Keep this browser tab active to use keyboard shortcuts!
             <CardDescription>
               Real-time assistance for slide {currentSlideIndex + 1} of {slides.length}
             </CardDescription>
-            <div className="mt-3">
-              <VoiceRecorder />
+            <div className="mt-3 flex space-x-2">
+              <VoiceRecorder onTranscript={setTranscript} />
+              <Button 
+                variant="outline" 
+                onClick={sendSummaryQuery}
+                disabled={summaryLoading || slides.length === 0}
+              >
+                <FileText className="w-4 h-4 mr-2" />
+                {summaryLoading ? "Generating..." : "Download Full Summary"}
+              </Button>
             </div>
           </CardHeader>
           <CardContent className="flex-1 overflow-hidden p-4">
@@ -819,8 +897,6 @@ Tip: Keep this browser tab active to use keyboard shortcuts!
             )}
           </CardContent>
         </Card>
-
-
       </div>
     </div>
   )
