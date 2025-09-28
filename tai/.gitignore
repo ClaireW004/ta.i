@@ -19,6 +19,9 @@ yarn-error.log*
 # env files
 .env*
 
+# service account keys (never commit)
+gcp-service-account.json
+
 # vercel
 .vercel
 
