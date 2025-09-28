@@ -513,7 +513,7 @@ Tip: Keep this browser tab active to use keyboard shortcuts!
                   {/* Content-only View */}
                   {viewMode === 'content' && (
                     <div className="max-w-4xl mx-auto">
-                      <div className="bg-white dark:bg-gray-900 p-8 rounded-lg border shadow-sm">
+                      <ScrollArea className="max-h-[65vh] p-8">
                         {currentSlide.title && (
                           <h2 className="text-3xl font-bold mb-6 text-center">{currentSlide.title}</h2>
                         )}
@@ -530,12 +530,7 @@ Tip: Keep this browser tab active to use keyboard shortcuts!
                             <p>No text content extracted for this slide</p>
                           </div>
                         )}
-                      </div>
-                      <div className="text-center mt-2">
-                        <Badge variant="outline" className="text-xs">
-                          📝 Text Content
-                        </Badge>
-                      </div>
+                      </ScrollArea>
                     </div>
                   )}
                   
@@ -560,41 +555,7 @@ Tip: Keep this browser tab active to use keyboard shortcuts!
                   )}
                 </div>
                 
-                {/* Slide Content */}
-                <div className="space-y-4">
-                  {currentSlide.title && (
-                    <div>
-                      <h2 className="text-xl font-semibold mb-3">{currentSlide.title}</h2>
-                    </div>
-                  )}
-                  
-                  {currentSlide.content && (
-                    <div className="prose prose-sm max-w-none">
-                      <div className="bg-muted/30 p-4 rounded-lg">
-                        <h3 className="text-sm font-medium mb-2 text-muted-foreground">Slide Content</h3>
-                        <div className="whitespace-pre-wrap text-sm leading-relaxed">
-                          {currentSlide.content}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Speaker Notes */}
-                  {currentSlide.speaker_notes && (
-                    <div>
-                      <Separator className="my-4" />
-                      <div className="bg-blue-50 dark:bg-blue-950/30 p-4 rounded-lg">
-                        <h3 className="text-sm font-medium mb-2 flex items-center text-blue-700 dark:text-blue-300">
-                          <MessageCircle className="w-4 h-4 mr-2" />
-                          Speaker Notes
-                        </h3>
-                        <p className="text-sm text-blue-600 dark:text-blue-200 leading-relaxed">
-                          {currentSlide.speaker_notes}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                </div>
+                {/* Removed lower duplicate content/notes for cleaner UI */}
               </div>
             </ScrollArea>
           </CardContent>
