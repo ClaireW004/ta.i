@@ -631,9 +631,9 @@ Tip: Keep this browser tab active to use keyboard shortcuts!
                           <CardContent className="p-4 space-y-4">
                             <div className="flex items-center justify-between">
                               <div className="flex items-center space-x-2">
-                                <Badge variant="default" className="bg-blue-600">
+                                {/* <Badge variant="default" className="bg-blue-600">
                                   📺 Presenter Mode Active
-                                </Badge>
+                                </Badge> */}
                                 <span className="text-sm text-blue-700 dark:text-blue-300">
                                   Share your screen with the presentation window for your audience
                                 </span>
@@ -654,12 +654,12 @@ Tip: Keep this browser tab active to use keyboard shortcuts!
                       )}
 
                       {/* Sync Information */}
-                      <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-3 mb-4">
+                      {/* <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-3 mb-4">
                         <div className="flex items-center space-x-2 text-sm text-blue-700 dark:text-blue-300">
                           <span className="font-medium">Synchronized Navigation:</span>
                           <span>Use the navigation buttons or keyboard arrows (← →) to control both the slide display and content below. The iframe will automatically load the correct slide.</span>
                         </div>
-                      </div>
+                      </div> */}
 
                       {/* Embedded Slide - synced with current slide */}
                       <div className="aspect-video w-full max-w-4xl mx-auto bg-gray-50 dark:bg-gray-900 rounded-lg overflow-hidden border-2 border-dashed border-gray-300 dark:border-gray-600 relative transition-all duration-300 ease-in-out">
@@ -693,17 +693,17 @@ Tip: Keep this browser tab active to use keyboard shortcuts!
                       
                       {/* Preloading handled by the main iframe array above */}
                       <div className="text-center space-y-2 transition-all duration-200">
-                        <div className="flex items-center justify-center space-x-2">
+                        {/* <div className="flex items-center justify-center space-x-2">
                           <Badge variant="default" className={`text-xs transition-all duration-200 ${slideLoading ? 'animate-pulse' : ''}`}>
                             {slideLoading ? '⟳ Loading' : '🔴 Live'} Slide {currentSlideIndex + 1} of {slides.length}
                           </Badge>
                           <Badge variant="outline" className="text-xs transition-all duration-200 hover:bg-muted">
                             {currentSlide.title || 'Untitled'}
                           </Badge>
-                        </div>
+                        </div> */}
 {/* <!--                         <p className="text-xs text-muted-foreground max-w-md mx-auto">
                           {presenterMode --> */}
-                        <p className="text-xs text-muted-foreground max-w-md mx-auto transition-opacity duration-200">
+                        <p className="text-s text-muted-foreground max-w-md mx-auto transition-opacity duration-200">
                           {presenterMode 
                             ? "🎭 Presenter Mode: Use navigation buttons or keyboard arrows (← →) to control both slides and content."
                             : "⚡ Use keyboard arrows (← →) or navigation buttons above to change slides."}
