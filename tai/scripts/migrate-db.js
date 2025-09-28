@@ -1,104 +1,78 @@
-const { Client } = require('pg')
+#!/usr/bin/env node
 const fs = require('fs')
 const path = require('path')
+const { Client } = require('pg')
 
-async function runMigration() {
-  const client = new Client({
-    host: process.env.DATABASE_HOST || 'localhost',
-    port: process.env.DATABASE_PORT || 5432,
-    database: process.env.DATABASE_NAME || 'tai_db',
-    user: process.env.DATABASE_USER || 'tai_user',
-    password: process.env.DATABASE_PASSWORD,
+// Load .env.local if present so the script picks up DATABASE_URL automatically
+try {
+  require('dotenv').config({ path: path.resolve(__dirname, '..', '.env.local') })
+} catch (e) {
+  // dotenv optional
+}
+
+async function promptYesNo(question) {
+  const readline = require('readline')
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout })
+  return new Promise((resolve) => {
+    rl.question(question, (ans) => {
+      rl.close()
+      resolve(ans.trim().toLowerCase() === 'y' || ans.trim().toLowerCase() === 'yes')
+    })
   })
+}
 
+async function run() {
+  const databaseUrl = process.env.DATABASE_URL
+  if (!databaseUrl) {
+    console.error('Please set DATABASE_URL in your environment or in .env.local')
+    process.exit(1)
+  }
+
+  const client = new Client({ connectionString: databaseUrl })
   try {
     await client.connect()
-    console.log('Connected to database')
+    console.log('Connected to Postgres')
 
-    // Check ALL existing tables in the public schema
-    const checkTables = await client.query(`
-      SELECT table_name 
-      FROM information_schema.tables 
-      WHERE table_schema = 'public'
-      ORDER BY table_name
-    `)
-
-    if (checkTables.rows.length > 0) {
-      console.log('📋 All existing tables found:')
-      checkTables.rows.forEach(row => console.log(`  - ${row.table_name}`))
-      
-      const readline = require('readline').createInterface({
-        input: process.stdin,
-        output: process.stdout
-      })
-
-      const answer = await new Promise((resolve) => {
-        readline.question('\nDo you want to recreate the schema? This will DROP ALL existing tables! (y/N): ', resolve)
-      })
-      readline.close()
-
-      if (answer.toLowerCase() === 'y' || answer.toLowerCase() === 'yes') {
-        console.log('🗑️  Dropping ALL existing tables...')
-        
-        // Drop all tables in the correct order (reverse dependency order)
-        const dropQueries = [
-          'DROP TABLE IF EXISTS slide_elements CASCADE;',
-          'DROP TABLE IF EXISTS slides CASCADE;', 
-          'DROP TABLE IF EXISTS import_jobs CASCADE;',
-          'DROP TABLE IF EXISTS presentations CASCADE;',
-          'DROP TABLE IF EXISTS user_sessions CASCADE;',
-          // Add any other tables that might exist
-          'DROP TABLE IF EXISTS users CASCADE;',
-          'DROP TABLE IF EXISTS accounts CASCADE;',
-          'DROP TABLE IF EXISTS sessions CASCADE;',
-          'DROP TABLE IF EXISTS verification_tokens CASCADE;'
-        ]
-
-        for (const query of dropQueries) {
-          try {
-            await client.query(query)
-          } catch (err) {
-            // Ignore errors for tables that don't exist
-            console.log(`  Note: ${err.message}`)
-          }
-        }
-        
-        console.log('✅ All existing tables dropped')
+    // Check existing tables
+    const res = await client.query(`SELECT table_name FROM information_schema.tables WHERE table_schema='public' ORDER BY table_name`)
+    if (res.rows.length > 0) {
+      console.log('Existing tables:')
+      res.rows.forEach(r => console.log(' -', r.table_name))
+      const shouldDrop = await promptYesNo('\nDrop all existing tables and re-create schema? This will DELETE DATA. (y/N): ')
+      if (shouldDrop) {
+        console.log('Dropping tables...')
+        const dropSql = `
+          DO $$ DECLARE r RECORD; BEGIN
+            FOR r IN (SELECT tablename FROM pg_tables WHERE schemaname = 'public') LOOP
+              EXECUTE 'DROP TABLE IF EXISTS ' || quote_ident(r.tablename) || ' CASCADE';
+            END LOOP;
+          END $$;
+        `
+        await client.query(dropSql)
+        console.log('Dropped existing tables.')
       } else {
-        console.log('✅ Migration skipped - tables already exist')
+        console.log('Skipping migration because tables exist.')
         return
       }
     }
 
-    // Run the schema migration
-    const schemaPath = path.join(__dirname, '../database/schema.sql')
-    
+    const schemaPath = path.resolve(__dirname, '..', 'database', 'schema.sql')
     if (!fs.existsSync(schemaPath)) {
-      console.error('❌ Schema file not found at:', schemaPath)
-      return
+      console.error('Schema file not found at', schemaPath)
+      process.exit(1)
     }
 
-    const schema = fs.readFileSync(schemaPath, 'utf8')
-    await client.query(schema)
-    console.log('✅ Database schema migrated successfully!')
+    const sql = fs.readFileSync(schemaPath, 'utf8')
+    console.log('Applying schema...')
+    await client.query(sql)
+    console.log('Schema applied successfully.')
 
-    // Verify tables were created
-    const verifyTables = await client.query(`
-      SELECT table_name 
-      FROM information_schema.tables 
-      WHERE table_schema = 'public'
-      ORDER BY table_name
-    `)
-    
-    console.log('\n📋 Tables created:')
-    verifyTables.rows.forEach(row => console.log(`  ✅ ${row.table_name}`))
-
-  } catch (error) {
-    console.error('❌ Migration failed:', error.message)
-    console.error('Full error:', error)
+  } catch (err) {
+    console.error('Migration failed:', err)
+    process.exitCode = 1
   } finally {
     await client.end()
   }
 }
 
-runMigration()
+run()
