@@ -135,7 +135,7 @@ export function PresentationViewer({ presentationId }: PresentationViewerProps) 
   const [presenterWindow, setPresenterWindow] = useState<Window | null>(null)
   const [slideLoading, setSlideLoading] = useState(false)
   const [response, setResponse] = useState("");
-  const [preloadedSlides, setPreloadedSlides] = useState<Set<number>>(new Set())
+  const [visitedSlides, setVisitedSlides] = useState<Set<number>>(new Set([0])) // Start with first slide visited
 
   // Load presentation data
   useEffect(() => {
@@ -219,15 +219,21 @@ export function PresentationViewer({ presentationId }: PresentationViewerProps) 
   const goToSlide = (index: number) => {
     console.log(`🔄 goToSlide called with index: ${index}, current: ${currentSlideIndex}, slides.length: ${slides.length}`)
     if (index >= 0 && index < slides.length) {
-      setSlideLoading(true)
       console.log(`✅ Navigating to slide ${index}`)
       setCurrentSlideIndex(index)
       console.log(`📝 setCurrentSlideIndex called with: ${index}`)
       
+      // Track visited slides for instant navigation
+      setVisitedSlides(prev => {
+        const newVisited = new Set([...prev, index])
+        console.log(`📊 Visited slides: [${Array.from(newVisited).sort().join(', ')}]`)
+        return newVisited
+      })
+      
       // Update URL to persist slide position across page refreshes
       if (typeof window !== 'undefined') {
         const url = new URL(window.location.href)
-        url.searchParams.set('slide', (index).toString()) // Convert 0-based to 1-based for URL
+        url.searchParams.set('slide', (index + 1).toString()) // Convert 0-based to 1-based for URL
         window.history.replaceState({}, '', url.toString())
       }
       
@@ -235,7 +241,7 @@ export function PresentationViewer({ presentationId }: PresentationViewerProps) 
       if (presenterWindow && !presenterWindow.closed && presentation?.source_url) {
         console.log('Updating presenter window to new slide', index)
         const newSlide = slides[index]
-        const newPresenterUrl = `https://docs.google.com/presentation/d/${presentation.source_url.match(/\/presentation\/d\/([a-zA-Z0-9-_]+)/)?.[1]}/present?start=false&loop=false&delayms=0&slide=${index}`
+        const newPresenterUrl = `https://docs.google.com/presentation/d/${presentation.source_url.match(/\/presentation\/d\/([a-zA-Z0-9-_]+)/)?.[1]}/present?start=false&loop=false&delayms=0&slide=${index + 1}`
         try {
           presenterWindow.location.href = newPresenterUrl
         } catch (error) {
@@ -243,8 +249,7 @@ export function PresentationViewer({ presentationId }: PresentationViewerProps) 
         }
       }
       
-      // Reset loading state after a brief moment
-      setTimeout(() => setSlideLoading(false), 100)
+      sendQuery();
     }
   }
 
@@ -397,7 +402,7 @@ Tip: Keep this browser tab active to use keyboard shortcuts!
           <div>
             <h1 className="text-2xl font-bold">{presentation.title}</h1>
             <p className="text-sm text-muted-foreground">
-              Slide {currentSlideIndex} of {slides.length}
+              Slide {currentSlideIndex + 1} of {slides.length}
             </p>
           </div>
           <div className="flex items-center space-x-2">
@@ -500,49 +505,39 @@ Tip: Keep this browser tab active to use keyboard shortcuts!
                       
                       {/* Embedded Slide - synced with current slide */}
                       <div className="aspect-video w-full max-w-4xl mx-auto bg-gray-50 dark:bg-gray-900 rounded-lg overflow-hidden border-2 border-dashed border-gray-300 dark:border-gray-600 relative transition-all duration-300 ease-in-out">
-                        {/* Loading overlay with smooth transition */}
-                        {slideLoading && (
-                          <div className="absolute inset-0 bg-black/10 dark:bg-white/10 backdrop-blur-sm flex items-center justify-center z-10 transition-opacity duration-200">
-                            <div className="bg-white dark:bg-gray-800 rounded-lg px-4 py-2 shadow-lg flex items-center space-x-2">
-                              <div className="animate-spin rounded-full h-4 w-4 border-2 border-blue-600 border-t-transparent"></div>
-                              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Loading slide {currentSlideIndex + 1}...</span>
-                            </div>
-                          </div>
-                        )}
-                        <iframe
-                          key={`slide-${currentSlideIndex}`} // Optimized key without timestamp
-                          src={getGoogleSlidesEmbedUrl(presentation.source_url, currentSlideIndex) || presentation.source_url}
-                          className={`w-full h-full border-0 transition-opacity duration-200 ${slideLoading ? 'opacity-50' : 'opacity-100'}`}
-                          allowFullScreen
-                          title={`Slide ${currentSlideIndex + 1}: ${currentSlide.title || 'Untitled'}`}
-                          loading="eager"
-                          onLoad={() => {
-                            // Reset loading state when iframe loads
-                            setSlideLoading(false)
-                            console.log(`Loaded slide ${currentSlideIndex + 1}`)
-                          }}
-                        />
+                        {/* Smart preloaded iframes - keep visited slides + adjacent slides loaded */}
+                        {slides.map((_, slideIndex) => {
+                          const isCurrentSlide = slideIndex === currentSlideIndex
+                          const isAdjacentSlide = Math.abs(slideIndex - currentSlideIndex) <= 1
+                          const isVisitedSlide = visitedSlides.has(slideIndex)
+                          const shouldLoad = isCurrentSlide || isAdjacentSlide || isVisitedSlide
+                          
+                          return shouldLoad ? (
+                            <iframe
+                              key={`slide-${slideIndex}`}
+                              src={presentation.source_url ? (getGoogleSlidesEmbedUrl(presentation.source_url, slideIndex) || presentation.source_url) : ''}
+                              className={`w-full h-full border-0 absolute inset-0 transition-opacity duration-150 ${
+                                isCurrentSlide ? 'opacity-100 z-10' : 'opacity-0 z-0'
+                              }`}
+                              allowFullScreen
+                              title={`Slide ${slideIndex + 1}: ${slides[slideIndex]?.title || 'Untitled'}`}
+                              loading={isCurrentSlide || isAdjacentSlide ? "eager" : "lazy"}
+                            />
+                          ) : null
+                        })}
                         {/* Overlay to prevent iframe interaction and maintain sync */}
                         <div 
-                          className="absolute inset-0 bg-transparent cursor-pointer hover:bg-blue-500/5 transition-colors duration-150"
+                          className="absolute inset-0 bg-transparent cursor-pointer hover:bg-blue-500/5 transition-colors duration-150 z-20"
                           onClick={nextSlide}
                           title="Click to advance to next slide"
                         />
                       </div>
                       
-                      {/* Hidden preloading iframe for next slide */}
-                      {currentSlideIndex < slides.length - 1 && presentation.source_url && (
-                        <iframe
-                          src={getGoogleSlidesEmbedUrl(presentation.source_url, currentSlideIndex) || ''}
-                          className="hidden"
-                          title={`Preload slide ${currentSlideIndex + 1}`}
-                          loading="lazy"
-                        />
-                      )}
+                      {/* Preloading handled by the main iframe array above */}
                       <div className="text-center space-y-2 transition-all duration-200">
                         <div className="flex items-center justify-center space-x-2">
                           <Badge variant="default" className={`text-xs transition-all duration-200 ${slideLoading ? 'animate-pulse' : ''}`}>
-                            {slideLoading ? '⟳ Loading' : '🔴 Live'} Slide {currentSlideIndex} of {slides.length}
+                            {slideLoading ? '⟳ Loading' : '🔴 Live'} Slide {currentSlideIndex + 1} of {slides.length}
                           </Badge>
                           <Badge variant="outline" className="text-xs transition-all duration-200 hover:bg-muted">
                             {currentSlide.title || 'Untitled'}
