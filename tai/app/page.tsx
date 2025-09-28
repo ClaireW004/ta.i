@@ -132,7 +132,7 @@ export default function Home() {
           <div className="max-w-2xl mx-auto">
             {/* Header */}
             <div className="text-center mb-12">
-              <h1 className="text-4xl font-bold text-foreground mb-4">Presenter Assist</h1>
+              <h1 className="text-4xl font-bold text-foreground mb-4">Teaching Assistant Intelligence</h1>
               <p className="text-lg text-muted-foreground">
                 Import your Google Slides to get started with AI-powered presentation assistance
               </p>
@@ -213,7 +213,7 @@ export default function Home() {
         <div className="container mx-auto px-4 py-4">
           <div className="flex justify-between items-center">
             <div>
-              <h1 className="text-2xl font-bold text-foreground">Presenter Assist</h1>
+              <h1 className="text-2xl font-bold text-foreground">Teaching Assistant Intelligence</h1>
               <p className="text-sm text-muted-foreground">AI-powered presentation tools</p>
             </div>
             <div className="flex items-center space-x-4">
