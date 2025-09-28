@@ -13,6 +13,7 @@ export interface PresentationRecord {
   source_type: string
   source_url?: string
   slide_count: number
+  total_seconds?: number | null
   created_at: Date
   updated_at: Date
   created_by?: string
@@ -54,25 +55,24 @@ export class DatabaseService {
   async createPresentation(data: Omit<PresentationRecord, 'id' | 'created_at' | 'updated_at'>): Promise<PresentationRecord> {
     const query = `
       INSERT INTO presentations (
-        presentation_id, title, source_type, source_url, slide_count, 
+        presentation_id, title, source_type, source_url, slide_count, total_seconds,
         created_by, thumbnail_url, locale, gcs_bucket, status
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
       RETURNING *
     `
-    
     const values = [
       data.presentation_id,
       data.title,
       data.source_type,
       data.source_url,
       data.slide_count,
+      data.total_seconds ?? null,
       data.created_by,
       data.thumbnail_url,
       data.locale,
       data.gcs_bucket,
       data.status,
     ]
-    
     const result = await pool.query(query, values)
     return result.rows[0]
   }

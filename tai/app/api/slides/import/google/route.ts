@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Authentication required" }, { status: 401 })
     }
 
-    const { presentationId, url } = await request.json()
+    const { presentationId, url, totalSeconds } = await request.json()
 
     if (!presentationId || !url) {
       return NextResponse.json({ error: "Missing presentationId or url" }, { status: 400 })
@@ -57,6 +57,7 @@ export async function POST(request: NextRequest) {
             status: 'processing',
             gcs_bucket: process.env.GOOGLE_CLOUD_STORAGE_BUCKET,
             locale: metadata.locale,
+            total_seconds: typeof totalSeconds === 'number' ? totalSeconds : (parseInt(totalSeconds) || null),
           })
         : await db.createPresentation({
             presentation_id: presentationId,
@@ -68,6 +69,7 @@ export async function POST(request: NextRequest) {
             gcs_bucket: process.env.GOOGLE_CLOUD_STORAGE_BUCKET,
             locale: metadata.locale,
             status: 'processing',
+            total_seconds: typeof totalSeconds === 'number' ? totalSeconds : (parseInt(totalSeconds) || null),
           })
 
       // Process and store each slide
