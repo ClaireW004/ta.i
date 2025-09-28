@@ -7,6 +7,7 @@ interface SuggestionRequest {
   currentSlideIndex: number
   slideContent?: string
   speakerNotes?: string
+  pacingReminderActive?: boolean
 }
 
 interface AISuggestion {
@@ -66,12 +67,12 @@ class MockAIService {
       priority: "medium"
     })
 
-    suggestions.push({
-      type: "timing",
-      title: "Pacing Reminder",
-      content: "Remember to pause after key points to let important information sink in. Aim for 2-3 minutes per slide depending on complexity.",
-      priority: "low"
-    })
+    // suggestions.push({
+    //   type: "timing",
+    //   title: "Pacing Reminder",
+    //   content: "Remember to pause after key points to let important information sink in. Aim for 2-3 minutes per slide depending on complexity.",
+    //   priority: "low"
+    // })
 
     return suggestions
   }
@@ -94,8 +95,8 @@ export async function POST(request: NextRequest) {
       }, { status: 401 })
     }
 
-    const body: SuggestionRequest = await request.json()
-    const { presentationId, currentSlideIndex, slideContent, speakerNotes } = body
+  const body: SuggestionRequest = await request.json()
+  const { presentationId, currentSlideIndex, slideContent, speakerNotes, pacingReminderActive } = body
 
     if (!presentationId || currentSlideIndex === undefined) {
       return NextResponse.json({ 
@@ -112,9 +113,18 @@ export async function POST(request: NextRequest) {
       speakerNotes
     )
 
+    // If the client indicates a pacing reminder is active, return a short pacingAdvice
+    // In a real system this could use presentation metadata (totalSeconds, slideCount)
+    // For now return a helpful one-liner or small suggestion.
+    let pacingAdvice: string | null = null
+    if (pacingReminderActive) {
+      pacingAdvice = "It might be time to transition to the next slide."
+    }
+
     return NextResponse.json({
       success: true,
       suggestions,
+      pacingAdvice,
       slideIndex: currentSlideIndex,
       timestamp: new Date().toISOString(),
     })

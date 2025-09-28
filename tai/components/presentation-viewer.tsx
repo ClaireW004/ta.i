@@ -1,12 +1,13 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import React, { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Input } from "@/components/ui/input"
+import { useTotalSeconds } from "./time-context";
 import { ChevronLeft, ChevronRight, Lightbulb, Clock, MessageCircle, TrendingUp, FileText, AlertCircle } from "lucide-react"
 import { VoiceRecorder } from "@/components/voice-recorder"
 import { send } from "process"
@@ -77,9 +78,8 @@ const getGoogleSlidesEmbedUrl = (sourceUrl: string, slideIndex: number) => {
     // Extract presentation ID from various Google Slides URL formats
     const match = sourceUrl.match(/\/presentation\/d\/([a-zA-Z0-9-_]+)/)
     if (!match) return null
-    
+
     const presentationId = match[1]
-    
     // Generate optimized embed URL for faster loading
     // Use slide index (0-based) with Google Slides embed format
     // Note: Due to cross-origin restrictions, we can only control the initial slide load
@@ -98,9 +98,9 @@ const openPresenterWindow = (sourceUrl: string, slideIndex: number) => {
   try {
     const match = sourceUrl.match(/\/presentation\/d\/([a-zA-Z0-9-_]+)/)
     if (!match) return null
-    
+
     const presentationId = match[1]
-    
+
     // Open Google Slides in presentation mode starting at the current slide
     const presenterUrl = `https://docs.google.com/presentation/d/${presentationId}/present?start=false&loop=false&delayms=3000&slide=${slideIndex}`
     
@@ -109,12 +109,12 @@ const openPresenterWindow = (sourceUrl: string, slideIndex: number) => {
       'presenter_window',
       'width=1920,height=1080,fullscreen=yes,toolbar=no,menubar=no,scrollbars=no,resizable=yes,location=no'
     )
-    
+
     // Focus the presenter window
     if (presenterWindow) {
       presenterWindow.focus()
     }
-    
+
     return presenterWindow
   } catch (error) {
     console.error('Error opening presenter window:', error)
@@ -122,7 +122,42 @@ const openPresenterWindow = (sourceUrl: string, slideIndex: number) => {
   }
 }
 
+function formatTime(secs: number): string {
+  const h = Math.floor(secs / 3600);
+  const m = Math.floor((secs % 3600) / 60);
+  const s = secs % 60;
+  return [h, m, s].map((n) => n.toString().padStart(2, "0")).join(":");
+}
+
+interface CountdownButtonProps {
+  totalSeconds: number; // pass this in from slide_importer.tsx
+}
+
+export function CountdownButton({ totalSeconds }: CountdownButtonProps) {
+  const [remaining, setRemaining] = useState(totalSeconds);
+
+  useEffect(() => {
+    setRemaining(totalSeconds); // reset if prop changes
+    const interval = setInterval(() => {
+      setRemaining((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [totalSeconds]);
+
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      className="text-xs"
+    >
+      {formatTime(remaining)}
+    </Button>
+  );
+}
+
 export function PresentationViewer({ presentationId }: PresentationViewerProps) {
+  const rawTotalSeconds = useTotalSeconds();
+  const totalSeconds = Number(rawTotalSeconds) || 0;
   const [presentation, setPresentation] = useState<Presentation | null>(null)
   const [slides, setSlides] = useState<Slide[]>([])
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0)
@@ -135,7 +170,12 @@ export function PresentationViewer({ presentationId }: PresentationViewerProps) 
   const [presenterWindow, setPresenterWindow] = useState<Window | null>(null)
   const [slideLoading, setSlideLoading] = useState(false)
   const [response, setResponse] = useState("");
-  const [visitedSlides, setVisitedSlides] = useState<Set<number>>(new Set([0])) // Start with first slide visited
+  // Show a UI pacing reminder when per-slide duration has elapsed
+  const [pacingReminderActive, setPacingReminderActive] = useState(false)
+  // Auto-advance timer ref (holds the timeout id)
+  const slideTimerRef = React.useRef<number | null>(null)
+  const perSlideDuration = slides.length > 0 && totalSeconds > 0 ? Math.floor(totalSeconds / slides.length) : 0
+  const [visitedSlides, setVisitedSlides] = useState<Set<number>>(new Set([0])) // Start with first slide visited -->
 
   // Load presentation data
   useEffect(() => {
@@ -143,15 +183,15 @@ export function PresentationViewer({ presentationId }: PresentationViewerProps) 
       try {
         setError(null)
         const response = await fetch(`/api/presentations/${presentationId}`)
-        
+
         if (!response.ok) {
           throw new Error(`Failed to load presentation: ${response.status}`)
         }
-        
+
         const data = await response.json()
         setPresentation(data.presentation)
         setSlides(data.slides || [])
-        
+
         // Auto-select best view mode based on available data
         if (data.presentation?.source_url?.includes('docs.google.com')) {
           setViewMode('embed')
@@ -217,10 +257,17 @@ export function PresentationViewer({ presentationId }: PresentationViewerProps) 
   }
 
   const goToSlide = (index: number) => {
+    // Clear any running per-slide timer when user navigates manually
+    if (slideTimerRef.current) {
+      window.clearTimeout(slideTimerRef.current)
+      slideTimerRef.current = null
+    }
+
     console.log(`🔄 goToSlide called with index: ${index}, current: ${currentSlideIndex}, slides.length: ${slides.length}`)
     if (index >= 0 && index < slides.length) {
       console.log(`✅ Navigating to slide ${index}`)
       setCurrentSlideIndex(index)
+
       console.log(`📝 setCurrentSlideIndex called with: ${index}`)
       
       // Track visited slides for instant navigation
@@ -248,9 +295,33 @@ export function PresentationViewer({ presentationId }: PresentationViewerProps) 
           console.log('Could not update presenter window URL, it may be on a different domain')
         }
       }
-      
+
+      // Reset loading state after a brief moment
+      setTimeout(() => setSlideLoading(false), 1000)
+      // Fetch agent suggestions for the newly selected slide
       sendQuery();
     }
+  }
+
+  // Start an auto-advance timer for the current slide. This will move to the next slide
+  // after `perSlideDuration` seconds. Timers are cleared on manual navigation.
+  const startSlideTimer = () => {
+    // Clear any existing timer first
+    if (slideTimerRef.current) {
+      window.clearTimeout(slideTimerRef.current)
+      slideTimerRef.current = null
+    }
+
+    // Don't start timer if there is no configured duration or no slides or on last slide
+    if (!perSlideDuration || slides.length === 0 || currentSlideIndex >= slides.length - 1) return
+
+    console.log(`Starting per-slide timer: ${perSlideDuration}s for slide ${currentSlideIndex + 1}`)
+    // When the per-slide timer expires, show a pacing reminder instead of auto-advancing.
+    // The user can then manually advance; manual navigation clears the reminder.
+    slideTimerRef.current = window.setTimeout(() => {
+      console.log('Per-slide duration elapsed — showing pacing reminder')
+      setPacingReminderActive(true)
+    }, perSlideDuration * 1000) as unknown as number
   }
 
   const handleOpenPresenterWindow = () => {
@@ -302,7 +373,7 @@ export function PresentationViewer({ presentationId }: PresentationViewerProps) 
     const handleKeyPress = (event: KeyboardEvent) => {
       // Only handle shortcuts if we're not typing in an input
       if (event.target instanceof HTMLInputElement) return
-      
+
       if (event.code === 'ArrowRight' || event.code === 'Space') {
         event.preventDefault()
         nextSlide()
@@ -320,6 +391,21 @@ export function PresentationViewer({ presentationId }: PresentationViewerProps) 
     window.addEventListener('keydown', handleKeyPress)
     return () => window.removeEventListener('keydown', handleKeyPress)
   }, [nextSlide, prevSlide, presenterMode, setPresenterMode])
+
+  // Whenever the slide changes, slides change, or totalSeconds changes, restart the per-slide timer
+  useEffect(() => {
+    // Start a new timer after slide change
+    startSlideTimer()
+
+    // Cleanup on unmount or before next timer
+    return () => {
+      if (slideTimerRef.current) {
+        window.clearTimeout(slideTimerRef.current)
+        slideTimerRef.current = null
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentSlideIndex, slides.length, totalSeconds])
 
   // Cleanup presenter window on unmount
   useEffect(() => {
@@ -408,6 +494,7 @@ Tip: Keep this browser tab active to use keyboard shortcuts!
           <div className="flex items-center space-x-2">
             {/* View Mode Toggle */}
             <div className="flex items-center space-x-1 mr-4">
+              
               <Button
                 variant={viewMode === 'embed' ? 'default' : 'outline'}
                 size="sm"
@@ -432,10 +519,11 @@ Tip: Keep this browser tab active to use keyboard shortcuts!
               >
                 📺 Presenter Mode
               </Button>
+              <CountdownButton totalSeconds={Number(totalSeconds) || 0} />
             </div>
-            
 
-            
+
+
             <Button
               variant="outline"
               size="sm"
@@ -489,12 +577,12 @@ Tip: Keep this browser tab active to use keyboard shortcuts!
                                 🚀 {presenterWindow && !presenterWindow.closed ? 'Refresh' : 'Open'} Presentation Window
                               </Button>
                             </div>
-                            
+
 
                           </CardContent>
                         </Card>
                       )}
-                      
+
                       {/* Sync Information */}
                       <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-3 mb-4">
                         <div className="flex items-center space-x-2 text-sm text-blue-700 dark:text-blue-300">
@@ -502,7 +590,7 @@ Tip: Keep this browser tab active to use keyboard shortcuts!
                           <span>Use the navigation buttons or keyboard arrows (← →) to control both the slide display and content below. Click the slide to advance.</span>
                         </div>
                       </div>
-                      
+
                       {/* Embedded Slide - synced with current slide */}
                       <div className="aspect-video w-full max-w-4xl mx-auto bg-gray-50 dark:bg-gray-900 rounded-lg overflow-hidden border-2 border-dashed border-gray-300 dark:border-gray-600 relative transition-all duration-300 ease-in-out">
                         {/* Smart preloaded iframes - keep visited slides + adjacent slides loaded */}
@@ -543,6 +631,8 @@ Tip: Keep this browser tab active to use keyboard shortcuts!
                             {currentSlide.title || 'Untitled'}
                           </Badge>
                         </div>
+{/* <!--                         <p className="text-xs text-muted-foreground max-w-md mx-auto">
+                          {presenterMode --> */}
                         <p className="text-xs text-muted-foreground max-w-md mx-auto transition-opacity duration-200">
                           {presenterMode 
                             ? "🎭 Presenter Mode: Use navigation buttons or keyboard arrows (← →) to control both slides and content."
@@ -551,9 +641,9 @@ Tip: Keep this browser tab active to use keyboard shortcuts!
                       </div>
                     </div>
                   )}
-                  
 
-                  
+
+
                   {/* Content-only View */}
                   {viewMode === 'content' && (
                     <div className="max-w-4xl mx-auto">
@@ -577,7 +667,7 @@ Tip: Keep this browser tab active to use keyboard shortcuts!
                       </ScrollArea>
                     </div>
                   )}
-                  
+
                   {/* Fallback when embed is not available */}
                   {viewMode === 'embed' && (!presentation.source_url || !presentation.source_url.includes('docs.google.com')) && (
                     <div className="text-center py-12">
@@ -598,8 +688,42 @@ Tip: Keep this browser tab active to use keyboard shortcuts!
                     </div>
                   )}
                 </div>
-                
-                {/* Removed lower duplicate content/notes for cleaner UI */}
+
+                {/* Slide Content */}
+                <div className="space-y-4">
+                  {currentSlide.title && (
+                    <div>
+                      <h2 className="text-xl font-semibold mb-3">{currentSlide.title}</h2>
+                    </div>
+                  )}
+
+                  {currentSlide.content && (
+                    <div className="prose prose-sm max-w-none">
+                      <div className="bg-muted/30 p-4 rounded-lg">
+                        <h3 className="text-sm font-medium mb-2 text-muted-foreground">Slide Content</h3>
+                        <div className="whitespace-pre-wrap text-sm leading-relaxed">
+                          {currentSlide.content}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Speaker Notes */}
+                  {currentSlide.speaker_notes && (
+                    <div>
+                      <Separator className="my-4" />
+                      <div className="bg-blue-50 dark:bg-blue-950/30 p-4 rounded-lg">
+                        <h3 className="text-sm font-medium mb-2 flex items-center text-blue-700 dark:text-blue-300">
+                          <MessageCircle className="w-4 h-4 mr-2" />
+                          Speaker Notes
+                        </h3>
+                        <p className="text-sm text-blue-600 dark:text-blue-200 leading-relaxed">
+                          {currentSlide.speaker_notes}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             </ScrollArea>
           </CardContent>
@@ -622,6 +746,25 @@ Tip: Keep this browser tab active to use keyboard shortcuts!
             </div>
           </CardHeader>
           <CardContent className="flex-1 overflow-hidden p-4">
+            {/* Pacing reminder shown when per-slide duration has elapsed */}
+            {pacingReminderActive && (
+              <div className="mb-3 w-88">
+                <Card className="p-3 border-yellow-200 bg-yellow-50">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center space-x-3">
+                      <AlertCircle className="w-5 h-5 text-yellow-700" />
+                      <div>
+                        <div className="font-medium">Pacing Reminder</div>
+                        <div className="text-sm text-muted-foreground">It might be time to transition to the next slide.</div>
+                      </div>
+                    </div>
+                    <div>
+                      <Button size="sm" variant="outline" onClick={() => setPacingReminderActive(false)}>Dismiss</Button>
+                    </div>
+                  </div>
+                </Card>
+              </div>
+            )}
             {suggestionsLoading ? (
               <div className="flex items-center justify-center h-32">
                 <div className="text-center">
