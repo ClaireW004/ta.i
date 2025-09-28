@@ -761,7 +761,7 @@ Tip: Keep this browser tab active to use keyboard shortcuts!
 
                 {/* Slide Content */}
                 <div className="space-y-4">
-                  {currentSlide.title && (
+                  {/* {currentSlide.title && (
                     <div>
                       <h2 className="text-xl font-semibold mb-3">{currentSlide.title}</h2>
                     </div>
@@ -770,13 +770,9 @@ Tip: Keep this browser tab active to use keyboard shortcuts!
                   {currentSlide.content && (
                     <div className="prose prose-sm max-w-none">
                       <div className="bg-muted/30 p-4 rounded-lg">
-                        <h3 className="text-sm font-medium mb-2 text-muted-foreground">Slide Content</h3>
-                        <div className="whitespace-pre-wrap text-sm leading-relaxed">
-                          {currentSlide.content}
-                        </div>
                       </div>
                     </div>
-                  )}
+                  )} */}
 
                   {/* Speaker Notes */}
                   {currentSlide.speaker_notes && (
