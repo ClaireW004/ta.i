@@ -8,6 +8,7 @@ import { Separator } from "@/components/ui/separator"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Input } from "@/components/ui/input"
 import { ChevronLeft, ChevronRight, Lightbulb, Clock, MessageCircle, TrendingUp, FileText, AlertCircle } from "lucide-react"
+import { VoiceRecorder } from "@/components/voice-recorder"
 import { send } from "process"
 
 interface Slide {
@@ -573,6 +574,9 @@ Tip: Keep this browser tab active to use keyboard shortcuts!
             <CardDescription>
               Real-time assistance for slide {currentSlideIndex + 1} of {slides.length}
             </CardDescription>
+            <div className="mt-3">
+              <VoiceRecorder />
+            </div>
           </CardHeader>
           <CardContent className="flex-1 overflow-hidden p-4">
             {suggestionsLoading ? (
