@@ -564,23 +564,6 @@ Tip: Keep this browser tab active to use keyboard shortcuts!
           <div className="flex items-center space-x-2">
             {/* View Mode Toggle */}
             <div className="flex items-center space-x-1 mr-4">
-              
-              <Button
-                variant={viewMode === 'embed' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setViewMode('embed')}
-                className="text-xs"
-              >
-                Live Slide
-              </Button>
-              {/* <Button
-                variant={viewMode === 'content' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setViewMode('content')}
-                className="text-xs"
-              >
-                Content
-              </Button> */}
               <Button
                 variant={presenterMode ? 'default' : 'outline'}
                 size="sm"
