@@ -128,12 +128,13 @@ export function PresentationViewer({ presentationId }: PresentationViewerProps) 
   const [suggestions, setSuggestions] = useState<Suggestion[]>([])
   const [loading, setLoading] = useState(true)
   const [suggestionsLoading, setSuggestionsLoading] = useState(false)
+  const [summaryLoading, setSummaryLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<'embed' | 'content'>('embed')
   const [presenterMode, setPresenterMode] = useState(false)
   const [presenterWindow, setPresenterWindow] = useState<Window | null>(null)
   const [slideLoading, setSlideLoading] = useState(false)
-  const [response, setResponse] = useState("");
+  const [response, setResponse] = useState("")
 
   // Load presentation data
   useEffect(() => {
@@ -273,6 +274,63 @@ export function PresentationViewer({ presentationId }: PresentationViewerProps) 
     }
   }
 
+  async function sendSummaryQuery() {
+    setSummaryLoading(true)
+
+    try {
+      // Concatenate content from all slides
+      const allText = slides
+        .map(slide => {
+          const title = slide.title ? `\n\n# ${slide.title}\n` : ""
+          const content = slide.content || ""
+          const notes = slide.speaker_notes ? `\n**Speaker Notes:**\n${slide.speaker_notes}` : ""
+          return `${title}${content}${notes}`
+        })
+        .join("\n\n---\n\n")
+
+      if (!allText.trim()) {
+        alert("No content to summarize.")
+        setSummaryLoading(false)
+        return
+      }
+
+      const res = await fetch("http://localhost:5000/summarize", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ text: allText }),
+      })
+
+      if (!res.ok) {
+        throw new Error(`Server responded with ${res.status}`)
+      }
+
+      const data = await res.json()
+      
+      const summaryContent = data.summary;
+      if (summaryContent) {
+        const blob = new Blob([summaryContent], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${presentation?.title || 'presentation'}_summary.txt`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      } else {
+        alert("Summary could not be generated.");
+      }
+
+    } catch (error) {
+      console.error("Error fetching summary:", error)
+      alert("Error communicating with summary AI backend.")
+    } finally {
+      setSummaryLoading(false)
+    }
+  }
+
   // Keyboard shortcuts for presentation control
   useEffect(() => {
     const handleKeyPress = (event: KeyboardEvent) => {
@@ -310,7 +368,7 @@ export function PresentationViewer({ presentationId }: PresentationViewerProps) 
   useEffect(() => {
     if (presenterMode) {
       console.log(`
-🎭 PRESENTER MODE ACTIVE 
+PRESENTER MODE ACTIVE 
 ------------------------
 Current slide: ${currentSlideIndex + 1} of ${slides.length}
 
@@ -470,7 +528,7 @@ Tip: Keep this browser tab active to use keyboard shortcuts!
                       {/* Sync Information */}
                       <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-3 mb-4">
                         <div className="flex items-center space-x-2 text-sm text-blue-700 dark:text-blue-300">
-                          <span className="font-medium">🔄 Synchronization:</span>
+                          <span className="font-medium">Synchronized Navigation:</span>
                           <span>Use the navigation buttons or keyboard arrows (← →) to control both the slide display and content below. The iframe will automatically load the correct slide.</span>
                         </div>
                       </div>
@@ -574,8 +632,16 @@ Tip: Keep this browser tab active to use keyboard shortcuts!
             <CardDescription>
               Real-time assistance for slide {currentSlideIndex + 1} of {slides.length}
             </CardDescription>
-            <div className="mt-3">
+            <div className="mt-3 flex space-x-2">
               <VoiceRecorder />
+              <Button 
+                variant="outline" 
+                onClick={sendSummaryQuery}
+                disabled={summaryLoading || slides.length === 0}
+              >
+                <FileText className="w-4 h-4 mr-2" />
+                {summaryLoading ? "Generating..." : "Download Full Summary"}
+              </Button>
             </div>
           </CardHeader>
           <CardContent className="flex-1 overflow-hidden p-4">
@@ -633,8 +699,6 @@ Tip: Keep this browser tab active to use keyboard shortcuts!
             )}
           </CardContent>
         </Card>
-
-
       </div>
     </div>
   )
