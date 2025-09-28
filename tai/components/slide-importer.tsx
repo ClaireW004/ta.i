@@ -223,12 +223,27 @@ export function SlideImporter({ onImportSuccess, onStartPresenting }: SlideImpor
       })
       return
     }
-    if (typeof onStartPresenting === "function") {
-      void onStartPresenting(importResult.id, totalSeconds)
-      return
+    const proceed = async () => {
+      if (typeof onStartPresenting === "function") {
+        try {
+          const res = await fetch(`/api/presentations/${importResult.id}`)
+          if (res.ok) {
+            const data = await res.json()
+            const total = data.presentation?.total_seconds ?? data.total_seconds ?? totalSeconds
+            await onStartPresenting(importResult.id, total)
+            return
+          }
+        } catch (err) {
+          console.warn("Failed to fetch presentation metadata for countdown:", err)
+          await onStartPresenting(importResult.id, totalSeconds)
+          return
+        }
+        await onStartPresenting(importResult.id, totalSeconds)
+        return
+      }
+      router.push(`/present/${importResult.id}`)
     }
-
-    router.push(`/present/${importResult.id}`)
+    void proceed()
   }
 
   if (importResult) {
@@ -300,18 +315,14 @@ export function SlideImporter({ onImportSuccess, onStartPresenting }: SlideImpor
             <Upload className="w-5 h-5" />
             Import Slides
           </CardTitle>
-          <CardDescription>Import your presentation from Google Slides or upload a PowerPoint file</CardDescription>
+          <CardDescription>Import your presentation from Google Slides</CardDescription>
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="google-slides" className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
+            <TabsList className="grid w-full grid-cols-1">
               <TabsTrigger value="google-slides" className="flex items-center gap-2">
                 <ExternalLink className="w-4 h-4" />
                 Google Slides
-              </TabsTrigger>
-              <TabsTrigger value="pptx" className="flex items-center gap-2">
-                <FileText className="w-4 h-4" />
-                PowerPoint
               </TabsTrigger>
             </TabsList>
 
@@ -350,41 +361,7 @@ export function SlideImporter({ onImportSuccess, onStartPresenting }: SlideImpor
               </Button>
             </TabsContent>
 
-            <TabsContent value="pptx" className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="pptx-file">PowerPoint File</Label>
-                <Input id="pptx-file" type="file" accept=".ppt,.pptx" onChange={handleFileUpload} disabled={isLoading} />
-                <p className="text-sm text-muted-foreground">
-                  Upload a PowerPoint file (.ppt or .pptx). Maximum file size: 50MB.
-                </p>
-              </div>
-
-              {selectedFile && (
-                <div className="bg-muted rounded-lg p-3">
-                  <div className="flex items-center gap-2">
-                    <FileText className="w-4 h-4 text-muted-foreground" />
-                    <span className="text-sm font-medium">{selectedFile.name}</span>
-                    <span className="text-sm text-muted-foreground">
-                      ({(selectedFile.size / 1024 / 1024).toFixed(1)} MB)
-                    </span>
-                  </div>
-                </div>
-              )}
-
-              <Button onClick={handlePptxImport} disabled={isLoading || !selectedFile} className="w-full">
-                {isLoading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Uploading...
-                  </>
-                ) : (
-                  <>
-                    <Upload className="w-4 h-4 mr-2" />
-                    Import PowerPoint File
-                  </>
-                )}
-              </Button>
-            </TabsContent>
+            
           </Tabs>
 
           <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-950 rounded-lg">
