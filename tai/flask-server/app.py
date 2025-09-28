@@ -96,9 +96,9 @@ def setup_summary_agent():
         model=AGENT_MODEL,
         description="Summarizes long text into a structured report format.",
         instruction=(
-            "Given a long text input, provide a concise summary formatted as a report. "
+            "Given a long text input of a slide deck's content and voice lecture transcript, provide a concise summary formatted as a report. "
             "The report should have a clear structure with headings and bullet points where appropriate. "
-            "Avoid any filler or conversational phrases."
+            "Avoid any filler or conversational phrases. Be clear what was from slides and what was from the lecture."
         )
     )
 
