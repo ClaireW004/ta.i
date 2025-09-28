@@ -8,6 +8,7 @@ CREATE TABLE presentations (
     source_type VARCHAR(50) NOT NULL, -- 'google-slides' or 'pptx'
     source_url TEXT,
     slide_count INTEGER NOT NULL DEFAULT 0,
+    total_seconds INTEGER DEFAULT NULL, -- total countdown seconds for presentation
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     created_by VARCHAR(255), -- user ID who imported the presentation

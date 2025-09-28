@@ -22,15 +22,17 @@ interface SlideImportResult {
 
 interface SlideImporterProps {
   onImportSuccess?: () => void | Promise<void>
+  onStartPresenting?: (presentationId: string, totalSeconds?: number) => void | Promise<void>
 }
 
-export function SlideImporter({ onImportSuccess }: SlideImporterProps = {}) {
+export function SlideImporter({ onImportSuccess, onStartPresenting }: SlideImporterProps = {}) {
   const [isLoading, setIsLoading] = useState(false)
   const [importResult, setImportResult] = useState<SlideImportResult | null>(null)
   const [googleSlidesUrl, setGoogleSlidesUrl] = useState("")
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [hours, setHours] = useState<string>("")
   const [minutes, setMinutes] = useState<string>("")
+  // optional callback provided by parent to open the presenter in-place
   const { toast } = useToast()
   const router = useRouter()
 
@@ -77,6 +79,7 @@ export function SlideImporter({ onImportSuccess }: SlideImporterProps = {}) {
         body: JSON.stringify({
           presentationId,
           url: googleSlidesUrl,
+          totalSeconds,
         }),
       })
 
@@ -158,8 +161,9 @@ export function SlideImporter({ onImportSuccess }: SlideImporterProps = {}) {
 
     setIsLoading(true)
     try {
-      const formData = new FormData()
-      formData.append("file", selectedFile)
+  const formData = new FormData()
+  formData.append("file", selectedFile)
+  formData.append("duration_seconds", String(totalSeconds))
 
       const response = await fetch("/api/slides/import/pptx", {
         method: "POST",
@@ -219,6 +223,10 @@ export function SlideImporter({ onImportSuccess }: SlideImporterProps = {}) {
       })
       return
     }
+    if (typeof onStartPresenting === "function") {
+      void onStartPresenting(importResult.id, totalSeconds)
+      return
+    }
 
     router.push(`/present/${importResult.id}`)
   }
@@ -249,7 +257,9 @@ export function SlideImporter({ onImportSuccess }: SlideImporterProps = {}) {
             <Button onClick={resetImport} variant="outline" className="flex-1 bg-transparent">
               Import Another Presentation
             </Button>
-            <Button onClick={startPresentation} className="flex-1">Start Presenting</Button>
+            <Button onClick={startPresentation} className="flex-1">
+              Start Presenting
+            </Button>
           </div>
         </CardContent>
       </Card>

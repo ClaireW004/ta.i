@@ -1,12 +1,13 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import React, { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Input } from "@/components/ui/input"
+import { useTotalSeconds } from "./time-context";
 import { ChevronLeft, ChevronRight, Lightbulb, Clock, MessageCircle, TrendingUp, FileText, AlertCircle } from "lucide-react"
 
 interface Slide {
@@ -75,9 +76,9 @@ const getGoogleSlidesEmbedUrl = (sourceUrl: string, slideNumber: number) => {
     // Extract presentation ID from various Google Slides URL formats
     const match = sourceUrl.match(/\/presentation\/d\/([a-zA-Z0-9-_]+)/)
     if (!match) return null
-    
+
     const presentationId = match[1]
-    
+
     // Generate embed URL that navigates to specific slide
     // Using slide ID format that Google Slides recognizes
     // Note: Due to cross-origin restrictions, we can only control the initial slide load
@@ -95,23 +96,23 @@ const openPresenterWindow = (sourceUrl: string, slideNumber: number) => {
   try {
     const match = sourceUrl.match(/\/presentation\/d\/([a-zA-Z0-9-_]+)/)
     if (!match) return null
-    
+
     const presentationId = match[1]
-    
+
     // Open Google Slides in presentation mode starting at the current slide
     const presenterUrl = `https://docs.google.com/presentation/d/${presentationId}/present?start=false&loop=false&delayms=3000&slide=id.p${slideNumber - 1}`
-    
+
     const presenterWindow = window.open(
       presenterUrl,
       'presenter_window',
       'width=1920,height=1080,fullscreen=yes,toolbar=no,menubar=no,scrollbars=no,resizable=yes,location=no'
     )
-    
+
     // Focus the presenter window
     if (presenterWindow) {
       presenterWindow.focus()
     }
-    
+
     return presenterWindow
   } catch (error) {
     console.error('Error opening presenter window:', error)
@@ -119,7 +120,41 @@ const openPresenterWindow = (sourceUrl: string, slideNumber: number) => {
   }
 }
 
+function formatTime(secs: number): string {
+  const h = Math.floor(secs / 3600);
+  const m = Math.floor((secs % 3600) / 60);
+  const s = secs % 60;
+  return [h, m, s].map((n) => n.toString().padStart(2, "0")).join(":");
+}
+
+interface CountdownButtonProps {
+  totalSeconds: number; // pass this in from slide_importer.tsx
+}
+
+export function CountdownButton({ totalSeconds }: CountdownButtonProps) {
+  const [remaining, setRemaining] = useState(totalSeconds);
+
+  useEffect(() => {
+    setRemaining(totalSeconds); // reset if prop changes
+    const interval = setInterval(() => {
+      setRemaining((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [totalSeconds]);
+
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      className="text-xs"
+    >
+      {formatTime(remaining)}
+    </Button>
+  );
+}
+
 export function PresentationViewer({ presentationId }: PresentationViewerProps) {
+  const totalSeconds = useTotalSeconds();
   const [presentation, setPresentation] = useState<Presentation | null>(null)
   const [slides, setSlides] = useState<Slide[]>([])
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0)
@@ -138,15 +173,15 @@ export function PresentationViewer({ presentationId }: PresentationViewerProps) 
       try {
         setError(null)
         const response = await fetch(`/api/presentations/${presentationId}`)
-        
+
         if (!response.ok) {
           throw new Error(`Failed to load presentation: ${response.status}`)
         }
-        
+
         const data = await response.json()
         setPresentation(data.presentation)
         setSlides(data.slides || [])
-        
+
         // Auto-select best view mode based on available data
         if (data.presentation?.source_url?.includes('docs.google.com')) {
           setViewMode('embed')
@@ -206,7 +241,7 @@ export function PresentationViewer({ presentationId }: PresentationViewerProps) 
       setSlideLoading(true)
       console.log(`Navigating to slide ${index}`)
       setCurrentSlideIndex(index)
-      
+
       // Update presenter window if it's open and in presenter mode
       if (presenterWindow && !presenterWindow.closed && presentation?.source_url) {
         console.log('Updating presenter window to new slide', index)
@@ -218,7 +253,7 @@ export function PresentationViewer({ presentationId }: PresentationViewerProps) 
           console.log('Could not update presenter window URL, it may be on a different domain')
         }
       }
-      
+
       // Reset loading state after a brief moment
       setTimeout(() => setSlideLoading(false), 1000)
     }
@@ -248,7 +283,7 @@ export function PresentationViewer({ presentationId }: PresentationViewerProps) 
     const handleKeyPress = (event: KeyboardEvent) => {
       // Only handle shortcuts if we're not typing in an input
       if (event.target instanceof HTMLInputElement) return
-      
+
       if (event.code === 'ArrowRight' || event.code === 'Space') {
         event.preventDefault()
         nextSlide()
@@ -350,6 +385,7 @@ Tip: Keep this browser tab active to use keyboard shortcuts!
           <div className="flex items-center space-x-2">
             {/* View Mode Toggle */}
             <div className="flex items-center space-x-1 mr-4">
+              
               <Button
                 variant={viewMode === 'embed' ? 'default' : 'outline'}
                 size="sm"
@@ -374,10 +410,11 @@ Tip: Keep this browser tab active to use keyboard shortcuts!
               >
                 📺 Presenter Mode
               </Button>
+              <CountdownButton totalSeconds={Number(totalSeconds) || 0} />
             </div>
-            
 
-            
+
+
             <Button
               variant="outline"
               size="sm"
@@ -431,12 +468,12 @@ Tip: Keep this browser tab active to use keyboard shortcuts!
                                 🚀 {presenterWindow && !presenterWindow.closed ? 'Refresh' : 'Open'} Presentation Window
                               </Button>
                             </div>
-                            
+
 
                           </CardContent>
                         </Card>
                       )}
-                      
+
                       {/* Sync Information */}
                       <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-3 mb-4">
                         <div className="flex items-center space-x-2 text-sm text-blue-700 dark:text-blue-300">
@@ -444,7 +481,7 @@ Tip: Keep this browser tab active to use keyboard shortcuts!
                           <span>Use the navigation buttons or keyboard arrows (← →) to control both the slide display and content below. The iframe will automatically load the correct slide.</span>
                         </div>
                       </div>
-                      
+
                       {/* Embedded Slide - synced with current slide */}
                       <div className="aspect-video w-full max-w-4xl mx-auto bg-gray-50 dark:bg-gray-900 rounded-lg overflow-hidden border-2 border-dashed border-gray-300 dark:border-gray-600">
                         <iframe
@@ -471,16 +508,16 @@ Tip: Keep this browser tab active to use keyboard shortcuts!
                           </Badge>
                         </div>
                         <p className="text-xs text-muted-foreground max-w-md mx-auto">
-                          {presenterMode 
+                          {presenterMode
                             ? "🎭 Presenter Mode: Use navigation buttons or keyboard arrows (← →) to control both slides and content."
                             : "⚡ Use keyboard arrows (← →) or navigation buttons above to change slides."}
                         </p>
                       </div>
                     </div>
                   )}
-                  
 
-                  
+
+
                   {/* Content-only View */}
                   {viewMode === 'content' && (
                     <div className="max-w-4xl mx-auto">
@@ -509,7 +546,7 @@ Tip: Keep this browser tab active to use keyboard shortcuts!
                       </div>
                     </div>
                   )}
-                  
+
                   {/* Fallback when embed is not available */}
                   {viewMode === 'embed' && (!presentation.source_url || !presentation.source_url.includes('docs.google.com')) && (
                     <div className="text-center py-12">
@@ -530,7 +567,7 @@ Tip: Keep this browser tab active to use keyboard shortcuts!
                     </div>
                   )}
                 </div>
-                
+
                 {/* Slide Content */}
                 <div className="space-y-4">
                   {currentSlide.title && (
@@ -538,7 +575,7 @@ Tip: Keep this browser tab active to use keyboard shortcuts!
                       <h2 className="text-xl font-semibold mb-3">{currentSlide.title}</h2>
                     </div>
                   )}
-                  
+
                   {currentSlide.content && (
                     <div className="prose prose-sm max-w-none">
                       <div className="bg-muted/30 p-4 rounded-lg">
