@@ -487,14 +487,14 @@ Tip: Keep this browser tab active to use keyboard shortcuts!
               >
                 Live Slide
               </Button>
-              <Button
+              {/* <Button
                 variant={viewMode === 'content' ? 'default' : 'outline'}
                 size="sm"
                 onClick={() => setViewMode('content')}
                 className="text-xs"
               >
                 Content
-              </Button>
+              </Button> */}
               <Button
                 variant={presenterMode ? 'default' : 'outline'}
                 size="sm"
@@ -626,7 +626,7 @@ Tip: Keep this browser tab active to use keyboard shortcuts!
 
                   
                   {/* Content-only View */}
-                  {viewMode === 'content' && (
+                  {/*viewMode === 'content' && (
                     <div className="max-w-4xl mx-auto">
                       <ScrollArea className="max-h-[65vh] p-8">
                         {currentSlide.title && (
@@ -647,7 +647,7 @@ Tip: Keep this browser tab active to use keyboard shortcuts!
                         )}
                       </ScrollArea>
                     </div>
-                  )}
+                  )*/}
                   
                   {/* Fallback when embed is not available */}
                   {viewMode === 'embed' && (!presentation.source_url || !presentation.source_url.includes('docs.google.com')) && (
