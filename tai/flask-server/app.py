@@ -35,8 +35,8 @@ def setup_agent():
     suggestion_agent = Agent(
         name="suggestion_agent_v1",
         model=AGENT_MODEL,
-        description="Provides suggestions on presentation slide content about what to say and examples to use.",
-        instruction="Given the text content of a presentation slide, generate short, clear, and concise speaking points with brief real-world examples that support the main message. Use an educational tone appropriate for a student audience. Do not include any introductory phrases, delivery tips, concluding remarks, or conversational filler. Output only in bullet point format. For each topic, include one speaking point and one brief example if relevant. Prioritize brevity, clarity, relevance, and speaker usability. Each bullet point should be easy to scan and speak aloud naturally. The total output must not exceed 100 words."
+        description="Provides script for a presentation slide content about what to say and examples to use.",
+        instruction="You are an expert AI teaching assistant that, given some lecture materials, specializes in providing high-quality scripts of what to talk about and how to explain concepts using examples.**Process:** 1. **Analyze:** Given the content of a slide from a lecture presentation, analyze and understand the topics covered in the slide. 2. **Provide script to aid learning:** Based on the information, provide suggestions in the form of a script that a teacher can easily read while teaching. The script should have examples or use cases when applicable to the slide's content. Do not label that this is a script or suggestions - simply provide the information requested. Present the final response without any introductory phrases. Focus on brevity and accuracy, ensuring the response is an objective representation of the source material. Avoid beginning your response with sentences like Okay, here's a script or Here are some suggestions."
     )
 
     session_service = InMemorySessionService()
@@ -84,7 +84,69 @@ def query():
     return jsonify({"response": response_text})
 
 
+# AGENT 2
+
+def setup_summary_agent():
+    global runner_summary, session_service_summary
+
+    AGENT_MODEL = "gemini-2.0-flash"
+
+    summary_agent = Agent(
+        name="summary_agent_v1",
+        model=AGENT_MODEL,
+        description="Summarizes presentation content and lecture transcription into a structured report format.",
+        instruction=(
+            "You are a meticulous AI assistant specializing in creating concise, structured summaries from academic lecture materials. Your task is to transform a text of lengthy slide contents and corresponding lecture transcripts into a clear, report-style summary that is easy to digest and reference. Process: 1. Synthesize: Combine and analyze the information from both the slide content and the lecture transcript, identifying the key concepts and supporting details. 2. Structure: Organize the synthesized information into a report format using clear headings and bullet points. 3. Format: Present the final summary without any conversational filler or introductory phrases. Focus on brevity and accuracy, ensuring the report is an objective representation of the source material."
+        )
+    )
+
+    session_service_summary = InMemorySessionService()
+
+    async def create_summary_session():
+        await session_service_summary.create_session(
+            app_name=APP_NAME,
+            user_id=USER_ID,
+            session_id="summary_session_001"
+        )
+
+    run_async(create_summary_session())
+
+    runner_summary = Runner(
+        agent=summary_agent,
+        app_name=APP_NAME,
+        session_service=session_service_summary
+    )
+
+
+async def call_summary_agent_async(long_text: str) -> str:
+    content = types.Content(role="user", parts=[types.Part(text=long_text)])
+
+    final_response_text = "Agent did not produce a final response."
+
+    async for event in runner_summary.run_async(user_id=USER_ID, session_id="summary_session_001", new_message=content):
+        if event.is_final_response():
+            if event.content and event.content.parts:
+                final_response_text = event.content.parts[0].text
+            break
+
+    return final_response_text
+
+
+@app.route("/summarize", methods=["POST"])
+def summarize():
+    data = request.json
+    if not data or "text" not in data:
+        return jsonify({"error": "Missing 'text' field"}), 400
+
+    long_text = data["text"]
+
+    response_text = run_async(call_summary_agent_async(long_text))
+
+    return jsonify({"summary": response_text})
+
+
 if __name__ == "__main__":
     print("Starting Flask AI agent API...")
     setup_agent()
+    setup_summary_agent()
     app.run(debug=True, host="0.0.0.0", port=5000)
