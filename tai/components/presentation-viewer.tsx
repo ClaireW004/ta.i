@@ -611,7 +611,7 @@ Tip: Keep this browser tab active to use keyboard shortcuts!
                       {/* Presenter Mode Controls */}
                       {presenterMode && (
                         <Card className="bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800">
-                          <CardContent className="p-4 space-y-4">
+                          <CardContent className="py-0.1 px-4 space-y-4">
                             <div className="flex items-center justify-between">
                               <div className="flex items-center space-x-2">
                                 {/* <Badge variant="default" className="bg-blue-600">
@@ -805,22 +805,20 @@ Tip: Keep this browser tab active to use keyboard shortcuts!
           <CardContent className="flex-1 overflow-hidden p-4">
             {/* Pacing reminder shown when per-slide duration has elapsed */}
             {pacingReminderActive && (
-              <div className="mb-3 w-88">
-                <Card className="p-3 border-yellow-200 bg-yellow-50">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center space-x-3">
-                      <AlertCircle className="w-5 h-5 text-yellow-700" />
-                      <div>
-                        <div className="font-medium">Pacing Reminder</div>
-                        <div className="text-sm text-muted-foreground">It might be time to transition to the next slide.</div>
-                      </div>
-                    </div>
+              <Card className="p-3 border-yellow-200 bg-yellow-50">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center space-x-3">
+                    <AlertCircle className="w-5 h-5 text-yellow-700" />
                     <div>
-                      <Button size="sm" variant="outline" onClick={() => setPacingReminderActive(false)}>Dismiss</Button>
+                      <div className="font-medium">Pacing Reminder</div>
+                      <div className="text-sm text-muted-foreground">It might be time to transition to the next slide.</div>
                     </div>
                   </div>
-                </Card>
-              </div>
+                  <div>
+                    <Button size="sm" variant="outline" onClick={() => setPacingReminderActive(false)}>Dismiss</Button>
+                  </div>
+                </div>
+              </Card>
             )}
             {suggestionsLoading ? (
               <div className="flex items-center justify-center h-32">
