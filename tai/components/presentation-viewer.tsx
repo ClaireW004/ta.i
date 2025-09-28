@@ -135,6 +135,7 @@ export function PresentationViewer({ presentationId }: PresentationViewerProps) 
   const [presenterWindow, setPresenterWindow] = useState<Window | null>(null)
   const [slideLoading, setSlideLoading] = useState(false)
   const [response, setResponse] = useState("")
+  const [transcript, setTranscript] = useState<string | null>(null)
 
   // Load presentation data
   useEffect(() => {
@@ -279,7 +280,7 @@ export function PresentationViewer({ presentationId }: PresentationViewerProps) 
 
     try {
       // Concatenate content from all slides
-      const allText = slides
+      const slideContent = slides
         .map(slide => {
           const title = slide.title ? `\n\n# ${slide.title}\n` : ""
           const content = slide.content || ""
@@ -288,7 +289,13 @@ export function PresentationViewer({ presentationId }: PresentationViewerProps) 
         })
         .join("\n\n---\n\n")
 
-      if (!allText.trim()) {
+      // Combine slide content and transcript
+      let fullText = slideContent;
+      if (transcript) {
+        fullText += `\n\n### Presentation Transcript\n\n${transcript}`;
+      }
+
+      if (!fullText.trim()) {
         alert("No content to summarize.")
         setSummaryLoading(false)
         return
@@ -299,7 +306,7 @@ export function PresentationViewer({ presentationId }: PresentationViewerProps) 
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ text: allText }),
+        body: JSON.stringify({ text: fullText }),
       })
 
       if (!res.ok) {
@@ -633,7 +640,7 @@ Tip: Keep this browser tab active to use keyboard shortcuts!
               Real-time assistance for slide {currentSlideIndex + 1} of {slides.length}
             </CardDescription>
             <div className="mt-3 flex space-x-2">
-              <VoiceRecorder />
+              <VoiceRecorder onTranscript={setTranscript} />
               <Button 
                 variant="outline" 
                 onClick={sendSummaryQuery}

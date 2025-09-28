@@ -5,7 +5,11 @@ import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 
-export function VoiceRecorder() {
+interface VoiceRecorderProps {
+  onTranscript: (transcript: string | null) => void;
+}
+
+export function VoiceRecorder({ onTranscript }: VoiceRecorderProps) {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<BlobPart[]>([])
   const [recording, setRecording] = useState(false)
@@ -23,6 +27,7 @@ export function VoiceRecorder() {
       setTranscript("")
       setFileUrl("")
       setStatus("Requesting microphone…")
+      onTranscript(null); // Clear transcript in parent
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
         ? "audio/webm;codecs=opus"
@@ -49,10 +54,12 @@ export function VoiceRecorder() {
           const data = await res.json()
           if (!res.ok) throw new Error(data?.error || "Transcription failed")
           setTranscript(data.transcript || "")
+          onTranscript(data.transcript || null); // Pass transcript to parent
           setFileUrl(data.file || "")
           setStatus("Done")
         } catch (err: any) {
           setStatus(err?.message || "Upload failed")
+          onTranscript(null); // Clear transcript on error
         }
       }
       recorder.start(250) // small timeslice to flush chunks
@@ -60,6 +67,7 @@ export function VoiceRecorder() {
     } catch (err: any) {
       setStatus(err?.message || "Microphone permission denied")
       setRecording(false)
+      onTranscript(null); // Clear transcript on permission error
     }
   }
 
