@@ -72,7 +72,7 @@ const getPriorityColor = (priority: string) => {
 }
 
 // Utility function to generate Google Slides embed URL with proper slide sync
-const getGoogleSlidesEmbedUrl = (sourceUrl: string, slideNumber: number) => {
+const getGoogleSlidesEmbedUrl = (sourceUrl: string, slideIndex: number) => {
   try {
     // Extract presentation ID from various Google Slides URL formats
     const match = sourceUrl.match(/\/presentation\/d\/([a-zA-Z0-9-_]+)/)
@@ -80,12 +80,13 @@ const getGoogleSlidesEmbedUrl = (sourceUrl: string, slideNumber: number) => {
     
     const presentationId = match[1]
     
-    // Generate embed URL that navigates to specific slide
-    // Using slide ID format that Google Slides recognizes
+    // Generate optimized embed URL for faster loading
+    // Use slide index (0-based) with Google Slides embed format
     // Note: Due to cross-origin restrictions, we can only control the initial slide load
     // Navigation within the iframe cannot be detected or controlled from outside
-    const timestamp = Date.now()
-    return `https://docs.google.com/presentation/d/${presentationId}/embed?start=false&loop=false&delayms=3000&slide=id.p${slideNumber}&rm=minimal&t=${timestamp}`
+    
+    // Optimized parameters for faster loading
+    return `https://docs.google.com/presentation/d/${presentationId}/embed?start=false&loop=false&delayms=0&slide=${slideIndex + 1}&rm=minimal&chrome=false`
   } catch (error) {
     console.error('Error generating embed URL:', error)
     return null
@@ -93,7 +94,7 @@ const getGoogleSlidesEmbedUrl = (sourceUrl: string, slideNumber: number) => {
 }
 
 // Utility to open presentation in presenter mode (full screen, separate window)
-const openPresenterWindow = (sourceUrl: string, slideNumber: number) => {
+const openPresenterWindow = (sourceUrl: string, slideIndex: number) => {
   try {
     const match = sourceUrl.match(/\/presentation\/d\/([a-zA-Z0-9-_]+)/)
     if (!match) return null
@@ -101,7 +102,7 @@ const openPresenterWindow = (sourceUrl: string, slideNumber: number) => {
     const presentationId = match[1]
     
     // Open Google Slides in presentation mode starting at the current slide
-    const presenterUrl = `https://docs.google.com/presentation/d/${presentationId}/present?start=false&loop=false&delayms=3000&slide=id.p${slideNumber - 1}`
+    const presenterUrl = `https://docs.google.com/presentation/d/${presentationId}/present?start=false&loop=false&delayms=3000&slide=${slideIndex}`
     
     const presenterWindow = window.open(
       presenterUrl,
@@ -136,6 +137,7 @@ export function PresentationViewer({ presentationId }: PresentationViewerProps) 
   const [slideLoading, setSlideLoading] = useState(false)
   const [response, setResponse] = useState("")
   const [transcript, setTranscript] = useState<string | null>(null)
+  const [visitedSlides, setVisitedSlides] = useState<Set<number>>(new Set([0])) // Start with first slide visited
 
   // Load presentation data
   useEffect(() => {
@@ -168,6 +170,14 @@ export function PresentationViewer({ presentationId }: PresentationViewerProps) 
 
     loadPresentation()
   }, [presentationId])
+
+  const handleKeyPress = (event: React.KeyboardEvent) => {
+    if (event.key === 'ArrowRight' || event.key === ' ') {
+      nextSlide();
+    } else if (event.key === 'ArrowLeft') {
+      prevSlide();
+    }
+  }
 
   // Load suggestions when slide changes
   useEffect(() => {
@@ -209,16 +219,31 @@ export function PresentationViewer({ presentationId }: PresentationViewerProps) 
   }
 
   const goToSlide = (index: number) => {
+    console.log(`🔄 goToSlide called with index: ${index}, current: ${currentSlideIndex}, slides.length: ${slides.length}`)
     if (index >= 0 && index < slides.length) {
-      setSlideLoading(true)
-      console.log(`Navigating to slide ${index}`)
+      console.log(`✅ Navigating to slide ${index}`)
       setCurrentSlideIndex(index)
+      console.log(`📝 setCurrentSlideIndex called with: ${index}`)
+      
+      // Track visited slides for instant navigation
+      setVisitedSlides(prev => {
+        const newVisited = new Set([...prev, index])
+        console.log(`📊 Visited slides: [${Array.from(newVisited).sort().join(', ')}]`)
+        return newVisited
+      })
+      
+      // Update URL to persist slide position across page refreshes
+      if (typeof window !== 'undefined') {
+        const url = new URL(window.location.href)
+        url.searchParams.set('slide', (index + 1).toString()) // Convert 0-based to 1-based for URL
+        window.history.replaceState({}, '', url.toString())
+      }
       
       // Update presenter window if it's open and in presenter mode
       if (presenterWindow && !presenterWindow.closed && presentation?.source_url) {
         console.log('Updating presenter window to new slide', index)
         const newSlide = slides[index]
-        const newPresenterUrl = `https://docs.google.com/presentation/d/${presentation.source_url.match(/\/presentation\/d\/([a-zA-Z0-9-_]+)/)?.[1]}/present?start=false&loop=false&delayms=3000&slide=id.p${newSlide.slide_number - 1}`
+        const newPresenterUrl = `https://docs.google.com/presentation/d/${presentation.source_url.match(/\/presentation\/d\/([a-zA-Z0-9-_]+)/)?.[1]}/present?start=false&loop=false&delayms=0&slide=${index + 1}`
         try {
           presenterWindow.location.href = newPresenterUrl
         } catch (error) {
@@ -226,14 +251,13 @@ export function PresentationViewer({ presentationId }: PresentationViewerProps) 
         }
       }
       
-      // Reset loading state after a brief moment
-      setTimeout(() => setSlideLoading(false), 1000)
+      sendQuery();
     }
   }
 
   const handleOpenPresenterWindow = () => {
     if (presentation?.source_url) {
-      const window = openPresenterWindow(presentation.source_url, currentSlide.slide_number)
+      const window = openPresenterWindow(presentation.source_url, currentSlideIndex)
       if (window) {
         setPresenterWindow(window)
         // Check if window is closed periodically
@@ -360,7 +384,7 @@ export function PresentationViewer({ presentationId }: PresentationViewerProps) 
 
     window.addEventListener('keydown', handleKeyPress)
     return () => window.removeEventListener('keydown', handleKeyPress)
-  }, [currentSlideIndex, slides.length, presenterMode])
+  }, [nextSlide, prevSlide, presenterMode, setPresenterMode])
 
   // Cleanup presenter window on unmount
   useEffect(() => {
@@ -430,8 +454,12 @@ Tip: Keep this browser tab active to use keyboard shortcuts!
 
   const currentSlide = slides[currentSlideIndex]
 
+
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-screen max-h-screen overflow-hidden">
+    <div
+      onKeyDown={handleKeyPress}
+      className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-screen max-h-screen overflow-hidden"
+    >
       {/* Slide Viewer - Left Side (2/3 width) */}
       <div className="lg:col-span-2 flex flex-col">
         {/* Header with navigation */}
@@ -486,7 +514,7 @@ Tip: Keep this browser tab active to use keyboard shortcuts!
               variant="outline"
               size="sm"
               onClick={nextSlide}
-              disabled={currentSlideIndex === slides.length - 1}
+              disabled={currentSlideIndex >= slides.length - 1}
             >
               Next
               <ChevronRight className="w-4 h-4" />
@@ -541,31 +569,46 @@ Tip: Keep this browser tab active to use keyboard shortcuts!
                       </div>
                       
                       {/* Embedded Slide - synced with current slide */}
-                      <div className="aspect-video w-full max-w-4xl mx-auto bg-gray-50 dark:bg-gray-900 rounded-lg overflow-hidden border-2 border-dashed border-gray-300 dark:border-gray-600">
-                        <iframe
-                          key={`slide-${currentSlideIndex}-${Date.now()}`} // Force complete re-render when slide changes
-                          src={getGoogleSlidesEmbedUrl(presentation.source_url, currentSlide.slide_number) || presentation.source_url}
-                          className="w-full h-full border-0"
-                          allowFullScreen
-                          title={`Slide ${currentSlideIndex + 1}: ${currentSlide.title || 'Untitled'}`}
-                          loading="eager"
-                          onLoad={() => {
-                            // Reset loading state when iframe loads
-                            setSlideLoading(false)
-                            console.log(`Loaded slide ${currentSlideIndex + 1}`)
-                          }}
+                      <div className="aspect-video w-full max-w-4xl mx-auto bg-gray-50 dark:bg-gray-900 rounded-lg overflow-hidden border-2 border-dashed border-gray-300 dark:border-gray-600 relative transition-all duration-300 ease-in-out">
+                        {/* Smart preloaded iframes - keep visited slides + adjacent slides loaded */}
+                        {slides.map((_, slideIndex) => {
+                          const isCurrentSlide = slideIndex === currentSlideIndex
+                          const isAdjacentSlide = Math.abs(slideIndex - currentSlideIndex) <= 1
+                          const isVisitedSlide = visitedSlides.has(slideIndex)
+                          const shouldLoad = isCurrentSlide || isAdjacentSlide || isVisitedSlide
+                          
+                          return shouldLoad ? (
+                            <iframe
+                              key={`slide-${slideIndex}`}
+                              src={presentation.source_url ? (getGoogleSlidesEmbedUrl(presentation.source_url, slideIndex) || presentation.source_url) : ''}
+                              className={`w-full h-full border-0 absolute inset-0 transition-opacity duration-150 ${
+                                isCurrentSlide ? 'opacity-100 z-10' : 'opacity-0 z-0'
+                              }`}
+                              allowFullScreen
+                              title={`Slide ${slideIndex + 1}: ${slides[slideIndex]?.title || 'Untitled'}`}
+                              loading={isCurrentSlide || isAdjacentSlide ? "eager" : "lazy"}
+                            />
+                          ) : null
+                        })}
+                        {/* Overlay to prevent iframe interaction and maintain sync */}
+                        <div 
+                          className="absolute inset-0 bg-transparent cursor-pointer hover:bg-blue-500/5 transition-colors duration-150 z-20"
+                          onClick={nextSlide}
+                          title="Click to advance to next slide"
                         />
                       </div>
-                      <div className="text-center space-y-2">
+                      
+                      {/* Preloading handled by the main iframe array above */}
+                      <div className="text-center space-y-2 transition-all duration-200">
                         <div className="flex items-center justify-center space-x-2">
-                          <Badge variant="default" className="text-xs">
-                            {slideLoading ? '⟳ Syncing' : '🔴 Live'} Slide {currentSlideIndex + 1} of {slides.length}
+                          <Badge variant="default" className={`text-xs transition-all duration-200 ${slideLoading ? 'animate-pulse' : ''}`}>
+                            {slideLoading ? '⟳ Loading' : '🔴 Live'} Slide {currentSlideIndex + 1} of {slides.length}
                           </Badge>
-                          <Badge variant="outline" className="text-xs">
+                          <Badge variant="outline" className="text-xs transition-all duration-200 hover:bg-muted">
                             {currentSlide.title || 'Untitled'}
                           </Badge>
                         </div>
-                        <p className="text-xs text-muted-foreground max-w-md mx-auto">
+                        <p className="text-xs text-muted-foreground max-w-md mx-auto transition-opacity duration-200">
                           {presenterMode 
                             ? "🎭 Presenter Mode: Use navigation buttons or keyboard arrows (← →) to control both slides and content."
                             : "⚡ Use keyboard arrows (← →) or navigation buttons above to change slides."}
