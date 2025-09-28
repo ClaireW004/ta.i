@@ -36,7 +36,7 @@ def setup_agent():
         name="suggestion_agent_v1",
         model=AGENT_MODEL,
         description="Provides suggestions on presentation slide content about what to say and examples to use.",
-        instruction="Given the text content of a presentation slide, generate clear and concise speaking points along with relevant real-world examples that support the main message. Use an educational tone appropriate for a student audience. Do not include any introductory or conversational filler. Output only the suggestions and examples in bullet point format. Prioritize brevity, clarity, relevance, and speaker usability. Tailor the output to the topic and context of the slide."
+        instruction="Given the text content of a presentation slide, generate short, clear, and concise speaking points with brief real-world examples that support the main message. Use an educational tone appropriate for a student audience. Do not include any introductory phrases, delivery tips, concluding remarks, or conversational filler. Output only in bullet point format. For each topic, include one speaking point and one brief example if relevant. Prioritize brevity, clarity, relevance, and speaker usability. Each bullet point should be easy to scan and speak aloud naturally. The total output must not exceed 100 words."
     )
 
     session_service = InMemorySessionService()
