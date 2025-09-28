@@ -549,7 +549,7 @@ Tip: Keep this browser tab active to use keyboard shortcuts!
   return (
     <div
       onKeyDown={handleKeyPress}
-      className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-screen max-h-screen overflow-hidden"
+      className="grid grid-cols-1 lg:grid-cols-3 gap-2 h-screen max-h-screen overflow-hidden"
     >
       {/* Slide Viewer - Left Side (2/3 width) */}
       <div className="lg:col-span-2 flex flex-col">
