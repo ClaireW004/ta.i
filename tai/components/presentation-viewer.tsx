@@ -174,7 +174,7 @@ export function PresentationViewer({ presentationId }: PresentationViewerProps) 
   }, [currentSlideIndex, slides])
 
   const loadSuggestions = async () => {
-    const currentSlide = slides[currentSlideIndex]
+    const currentSlide = slides[currentSlideIndex + 1]
     if (!currentSlide) return
 
     setSuggestionsLoading(true)
@@ -196,6 +196,8 @@ export function PresentationViewer({ presentationId }: PresentationViewerProps) 
         const data = await response.json()
         setSuggestions(data.suggestions || [])
       }
+      // Fetch agent suggestions for the newly selected slide
+      sendQuery();
     } catch (error) {
       console.error("Error loading suggestions:", error)
     } finally {
@@ -223,8 +225,6 @@ export function PresentationViewer({ presentationId }: PresentationViewerProps) 
       
       // Reset loading state after a brief moment
       setTimeout(() => setSlideLoading(false), 1000)
-      // Fetch agent suggestions for the newly selected slide
-      sendQuery();
     }
   }
 
