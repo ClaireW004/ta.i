@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { useSession, signIn, signOut } from "next-auth/react"
 import { SlideImporter } from "@/components/slide-importer"
 import { PresentationViewer } from "@/components/presentation-viewer"
+import { TimeContext } from "@/components/time-context"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -23,6 +24,7 @@ export default function Home() {
   const [presentations, setPresentations] = useState<Presentation[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedPresentationId, setSelectedPresentationId] = useState<string | null>(null)
+  const [selectedPresentationSeconds, setSelectedPresentationSeconds] = useState<number | null>(null)
 
   // Automatically sign out if there's an auth error to clear corrupted session
   useEffect(() => {
@@ -56,8 +58,9 @@ export default function Home() {
     }
   }
 
-  const handlePresentationSelect = (presentationId: string) => {
+  const handlePresentationSelect = (presentationId: string, totalSeconds?: number | null) => {
     setSelectedPresentationId(presentationId)
+    setSelectedPresentationSeconds(totalSeconds ?? null)
   }
 
   const handleBackToList = () => {
@@ -129,7 +132,7 @@ export default function Home() {
           <div className="max-w-2xl mx-auto">
             {/* Header */}
             <div className="text-center mb-12">
-              <h1 className="text-4xl font-bold text-foreground mb-4">Presenter Assist</h1>
+              <h1 className="text-4xl font-bold text-foreground mb-4">Teaching Assistant Intelligence</h1>
               <p className="text-lg text-muted-foreground">
                 Import your Google Slides to get started with AI-powered presentation assistance
               </p>
@@ -194,7 +197,10 @@ export default function Home() {
           </div>
         </div>
         <div className="container mx-auto px-4 py-6">
-          <PresentationViewer presentationId={selectedPresentationId} />
+          {/* Provide the selected presentation's total seconds to the viewer */}
+          <TimeContext.Provider value={selectedPresentationSeconds ?? 0}>
+            <PresentationViewer presentationId={selectedPresentationId} />
+          </TimeContext.Provider>
         </div>
       </div>
     )
@@ -207,7 +213,7 @@ export default function Home() {
         <div className="container mx-auto px-4 py-4">
           <div className="flex justify-between items-center">
             <div>
-              <h1 className="text-2xl font-bold text-foreground">Presenter Assist</h1>
+              <h1 className="text-2xl font-bold text-foreground">Teaching Assistant Intelligence</h1>
               <p className="text-sm text-muted-foreground">AI-powered presentation tools</p>
             </div>
             <div className="flex items-center space-x-4">
@@ -232,7 +238,7 @@ export default function Home() {
         <div className="max-w-4xl mx-auto">
           {/* Import Section */}
           <div className="mb-12">
-            <SlideImporter onImportSuccess={loadPresentations} />
+            <SlideImporter onImportSuccess={loadPresentations} onStartPresenting={handlePresentationSelect} />
           </div>
 
           {/* Presentations Section */}
@@ -283,7 +289,21 @@ export default function Home() {
                     </CardHeader>
                     <CardContent>
                       <Button
-                        onClick={() => handlePresentationSelect(presentation.presentation_id)}
+                        onClick={async () => {
+                          try {
+                            const res = await fetch(`/api/presentations/${presentation.presentation_id}`)
+                            if (res.ok) {
+                              const data = await res.json()
+                              const total = data.presentation?.total_seconds ?? data.total_seconds ?? null
+                              handlePresentationSelect(presentation.presentation_id, total)
+                              return
+                            }
+                          } catch (err) {
+                            console.warn('Failed to fetch presentation metadata for countdown:', err)
+                          }
+
+                          handlePresentationSelect(presentation.presentation_id)
+                        }}
                         className="w-full"
                         size="sm"
                       >

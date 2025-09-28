@@ -94,6 +94,31 @@ export class CloudStorageService {
     }
   }
 
+  async uploadFile(bucketOrPath: string | undefined, objectPath: string, buffer: Buffer): Promise<string> {
+    try {
+      const bucketToUse = bucketOrPath && bucketOrPath.startsWith('gs://') ? this.bucketName : (bucketOrPath || this.bucketName)
+      const fileName = objectPath
+      const file = this.storage.bucket(bucketToUse).file(fileName)
+
+      await file.save(buffer)
+      return `gs://${bucketToUse}/${fileName}`
+    } catch (error) {
+      console.error('Error uploading file:', error)
+      throw new Error(`Failed to upload file: ${error}`)
+    }
+  }
+
+  async deleteFile(bucketOrPath: string | undefined, objectPath: string): Promise<void> {
+    try {
+      const bucketToUse = bucketOrPath || this.bucketName
+      const file = this.storage.bucket(bucketToUse).file(objectPath)
+      await file.delete({ ignoreNotFound: true })
+    } catch (error) {
+      console.error('Error deleting file:', error)
+      // don't rethrow; caller may attempt cleanup but shouldn't crash because of delete failure
+    }
+  }
+
   async getSignedUrl(filePath: string, expirationMinutes = 60): Promise<string> {
     try {
       // Remove gs:// prefix if present
