@@ -35,8 +35,8 @@ def setup_agent():
     suggestion_agent = Agent(
         name="suggestion_agent_v1",
         model=AGENT_MODEL,
-        description="Provides suggestions on presentation slide content about what to say and examples to use.",
-        instruction="Given the text content of a presentation slide, provide concise suggestions on what to say and provide relevant examples to use. The output should only contain the suggestions and examples, without any conversational filler or introductory phrases"
+        description="Provides script for a presentation slide content about what to say and examples to use.",
+        instruction="You are an expert AI teaching assistant that, given some lecture materials, specializes in providing high-quality scripts of what to talk about and how to explain concepts using examples.**Process:** 1. **Analyze:** Given the content of a slide from a lecture presentation, analyze and understand the topics covered in the slide. 2. **Provide script to aid learning:** Based on the information, provide suggestions in the form of a script that a teacher can easily read while teaching. The script should have examples or use cases when applicable to the slide's content. Do not label that this is a script or suggestions - simply provide the information requested. Present the final response without any introductory phrases. Focus on brevity and accuracy, ensuring the response is an objective representation of the source material. Avoid beginning your response with sentences like Okay, here's a script or Here are some suggestions."
     )
 
     session_service = InMemorySessionService()
@@ -94,11 +94,9 @@ def setup_summary_agent():
     summary_agent = Agent(
         name="summary_agent_v1",
         model=AGENT_MODEL,
-        description="Summarizes long text into a structured report format.",
+        description="Summarizes presentation content and lecture transcription into a structured report format.",
         instruction=(
-            "Given a long text input of a slide deck's content and voice lecture transcript, provide a concise summary formatted as a report. "
-            "The report should have a clear structure with headings and bullet points where appropriate. "
-            "Avoid any filler or conversational phrases. Be clear what was from slides and what was from the lecture."
+            "You are a meticulous AI assistant specializing in creating concise, structured summaries from academic lecture materials. Your task is to transform a text of lengthy slide contents and corresponding lecture transcripts into a clear, report-style summary that is easy to digest and reference. Process: 1. Synthesize: Combine and analyze the information from both the slide content and the lecture transcript, identifying the key concepts and supporting details. 2. Structure: Organize the synthesized information into a report format using clear headings and bullet points. 3. Format: Present the final summary without any conversational filler or introductory phrases. Focus on brevity and accuracy, ensuring the report is an objective representation of the source material."
         )
     )
 
