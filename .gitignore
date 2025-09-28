@@ -1,1 +1,41 @@
 .env
+
+# OS
+**/.DS_Store
+
+# Node/JS
+**/node_modules/
+**/.next/
+**/dist/
+**/build/
+**/.turbo/
+**/.vercel/
+**/out/
+
+# Logs
+**/npm-debug.log*
+**/pnpm-debug.log*
+**/yarn-debug.log*
+**/yarn-error.log*
+**/logs/
+**/*.log
+
+# Env files
+**/.env
+**/.env.*
+
+# Python
+**/.venv/
+**/venv/
+**/__pycache__/
+**/*.py[cod]
+
+# Editor
+.vscode/
+.idea/
+
+# Misc
+**/.cache/
+**/.pytest_cache/
+**/.coverage
+coverage/
