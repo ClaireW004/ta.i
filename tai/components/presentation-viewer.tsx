@@ -155,7 +155,8 @@ export function CountdownButton({ totalSeconds }: CountdownButtonProps) {
 }
 
 export function PresentationViewer({ presentationId }: PresentationViewerProps) {
-  const totalSeconds = useTotalSeconds();
+  const rawTotalSeconds = useTotalSeconds();
+  const totalSeconds = Number(rawTotalSeconds) || 0;
   const [presentation, setPresentation] = useState<Presentation | null>(null)
   const [slides, setSlides] = useState<Slide[]>([])
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0)
@@ -168,6 +169,12 @@ export function PresentationViewer({ presentationId }: PresentationViewerProps) 
   const [presenterWindow, setPresenterWindow] = useState<Window | null>(null)
   const [slideLoading, setSlideLoading] = useState(false)
   const [response, setResponse] = useState("");
+  // Show a UI pacing reminder when per-slide duration has elapsed
+  const [pacingReminderActive, setPacingReminderActive] = useState(false)
+  // Auto-advance timer ref (holds the timeout id)
+  const slideTimerRef = React.useRef<number | null>(null)
+  // Optional: how many seconds this slide should be shown (computed)
+  const perSlideDuration = slides.length > 0 && totalSeconds > 0 ? Math.floor(totalSeconds / slides.length) : 0
 
   // Load presentation data
   useEffect(() => {
@@ -239,6 +246,12 @@ export function PresentationViewer({ presentationId }: PresentationViewerProps) 
   }
 
   const goToSlide = (index: number) => {
+    // Clear any running per-slide timer when user navigates manually
+    if (slideTimerRef.current) {
+      window.clearTimeout(slideTimerRef.current)
+      slideTimerRef.current = null
+    }
+
     if (index >= 0 && index < slides.length) {
       setSlideLoading(true)
       console.log(`Navigating to slide ${index}`)
@@ -261,6 +274,27 @@ export function PresentationViewer({ presentationId }: PresentationViewerProps) 
       // Fetch agent suggestions for the newly selected slide
       sendQuery();
     }
+  }
+
+  // Start an auto-advance timer for the current slide. This will move to the next slide
+  // after `perSlideDuration` seconds. Timers are cleared on manual navigation.
+  const startSlideTimer = () => {
+    // Clear any existing timer first
+    if (slideTimerRef.current) {
+      window.clearTimeout(slideTimerRef.current)
+      slideTimerRef.current = null
+    }
+
+    // Don't start timer if there is no configured duration or no slides or on last slide
+    if (!perSlideDuration || slides.length === 0 || currentSlideIndex >= slides.length - 1) return
+
+    console.log(`Starting per-slide timer: ${perSlideDuration}s for slide ${currentSlideIndex + 1}`)
+    // When the per-slide timer expires, show a pacing reminder instead of auto-advancing.
+    // The user can then manually advance; manual navigation clears the reminder.
+    slideTimerRef.current = window.setTimeout(() => {
+      console.log('Per-slide duration elapsed — showing pacing reminder')
+      setPacingReminderActive(true)
+    }, perSlideDuration * 1000) as unknown as number
   }
 
   const handleOpenPresenterWindow = () => {
@@ -330,6 +364,21 @@ export function PresentationViewer({ presentationId }: PresentationViewerProps) 
     window.addEventListener('keydown', handleKeyPress)
     return () => window.removeEventListener('keydown', handleKeyPress)
   }, [currentSlideIndex, slides.length, presenterMode])
+
+  // Whenever the slide changes, slides change, or totalSeconds changes, restart the per-slide timer
+  useEffect(() => {
+    // Start a new timer after slide change
+    startSlideTimer()
+
+    // Cleanup on unmount or before next timer
+    return () => {
+      if (slideTimerRef.current) {
+        window.clearTimeout(slideTimerRef.current)
+        slideTimerRef.current = null
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentSlideIndex, slides.length, totalSeconds])
 
   // Cleanup presenter window on unmount
   useEffect(() => {
@@ -646,6 +695,25 @@ Tip: Keep this browser tab active to use keyboard shortcuts!
             </CardDescription>
           </CardHeader>
           <CardContent className="flex-1 overflow-hidden p-4">
+            {/* Pacing reminder shown when per-slide duration has elapsed */}
+            {pacingReminderActive && (
+              <div className="mb-3 w-88">
+                <Card className="p-3 border-yellow-200 bg-yellow-50">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center space-x-3">
+                      <AlertCircle className="w-5 h-5 text-yellow-700" />
+                      <div>
+                        <div className="font-medium">Pacing Reminder</div>
+                        <div className="text-sm text-muted-foreground">It might be time to transition to the next slide.</div>
+                      </div>
+                    </div>
+                    <div>
+                      <Button size="sm" variant="outline" onClick={() => setPacingReminderActive(false)}>Dismiss</Button>
+                    </div>
+                  </div>
+                </Card>
+              </div>
+            )}
             {suggestionsLoading ? (
               <div className="flex items-center justify-center h-32">
                 <div className="text-center">
