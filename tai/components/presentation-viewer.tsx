@@ -9,6 +9,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Input } from "@/components/ui/input"
 import { useTotalSeconds } from "./time-context";
 import { ChevronLeft, ChevronRight, Lightbulb, Clock, MessageCircle, TrendingUp, FileText, AlertCircle } from "lucide-react"
+import { send } from "process"
 
 interface Slide {
   id: number
@@ -166,6 +167,7 @@ export function PresentationViewer({ presentationId }: PresentationViewerProps) 
   const [presenterMode, setPresenterMode] = useState(false)
   const [presenterWindow, setPresenterWindow] = useState<Window | null>(null)
   const [slideLoading, setSlideLoading] = useState(false)
+  const [response, setResponse] = useState("");
 
   // Load presentation data
   useEffect(() => {
@@ -256,6 +258,8 @@ export function PresentationViewer({ presentationId }: PresentationViewerProps) 
 
       // Reset loading state after a brief moment
       setTimeout(() => setSlideLoading(false), 1000)
+      // Fetch agent suggestions for the newly selected slide
+      sendQuery();
     }
   }
 
@@ -277,6 +281,31 @@ export function PresentationViewer({ presentationId }: PresentationViewerProps) 
 
   const nextSlide = () => goToSlide(currentSlideIndex + 1)
   const prevSlide = () => goToSlide(currentSlideIndex - 1)
+
+  async function sendQuery() {
+    // Safely read the current slide content at call time
+    const slide = slides[currentSlideIndex]
+    const queryText = slide?.content || slide?.title || ""
+    if (!queryText) {
+      setResponse("")
+      return
+    }
+
+    setResponse("")
+    try {
+      const res = await fetch("http://localhost:5000/query", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ query: queryText }),
+      })
+      const data = await res.json()
+      setResponse(data.response)
+    } catch (error) {
+      setResponse("Error communicating with AI backend.")
+    }
+  }
 
   // Keyboard shortcuts for presentation control
   useEffect(() => {
@@ -521,7 +550,7 @@ Tip: Keep this browser tab active to use keyboard shortcuts!
                   {/* Content-only View */}
                   {viewMode === 'content' && (
                     <div className="max-w-4xl mx-auto">
-                      <div className="bg-white dark:bg-gray-900 p-8 rounded-lg border shadow-sm">
+                      <ScrollArea className="max-h-[65vh] p-8">
                         {currentSlide.title && (
                           <h2 className="text-3xl font-bold mb-6 text-center">{currentSlide.title}</h2>
                         )}
@@ -538,12 +567,7 @@ Tip: Keep this browser tab active to use keyboard shortcuts!
                             <p>No text content extracted for this slide</p>
                           </div>
                         )}
-                      </div>
-                      <div className="text-center mt-2">
-                        <Badge variant="outline" className="text-xs">
-                          📝 Text Content
-                        </Badge>
-                      </div>
+                      </ScrollArea>
                     </div>
                   )}
 
@@ -632,6 +656,23 @@ Tip: Keep this browser tab active to use keyboard shortcuts!
             ) : suggestions.length > 0 ? (
               <ScrollArea className="h-full pr-4">
                 <div className="space-y-3">
+                  {/* Agent response (from Flask) shown at the top if available */}
+                  {response && (
+                    <Card className="p-3 border-primary/30">
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex items-center space-x-2 flex-1 min-w-0">
+                          <Lightbulb className="w-4 h-4" />
+                          <span className="font-medium text-sm truncate">Agent Suggestion</span>
+                        </div>
+                        <Badge variant="default" className="text-xs flex-shrink-0 ml-2">
+                          live
+                        </Badge>
+                      </div>
+                      <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
+                        {response}
+                      </p>
+                    </Card>
+                  )}
                   {suggestions.map((suggestion, index) => (
                     <Card key={index} className="p-3 hover:bg-muted/30 transition-colors border border-muted">
                       <div className="flex items-start justify-between mb-2">
