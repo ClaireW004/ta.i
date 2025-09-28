@@ -300,8 +300,6 @@ export function PresentationViewer({ presentationId }: PresentationViewerProps) 
 
       // Reset loading state after a brief moment
       setTimeout(() => setSlideLoading(false), 1000)
-      // Fetch agent suggestions for the newly selected slide
-      sendQuery();
     }
   }
 
